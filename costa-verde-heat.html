@@ -1,0 +1,4056 @@
+<!DOCTYPE html>
+<!-- Costa Verde Heat — Round 4 single-file playable copy (repo snapshot 0c523b7). All game code inlined; no network requests. -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Costa Verde Heat — Kota Pantai Tropis</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1230; font-family: "Segoe UI", Arial, sans-serif; }
+  #game { position: fixed; inset: 0; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; }
+  .panel { background: rgba(10, 10, 18, 0.72); border-radius: 10px; padding: 10px 14px; }
+  /* Panel misi kiri atas */
+  #mission-panel { position: absolute; top: 14px; left: 14px; max-width: 340px; }
+  #mission-title { color: #ffe020; font-weight: 800; font-size: 15px; letter-spacing: 0.5px; }
+  #mission-stage { color: #c8c8c8; font-size: 12px; margin-top: 2px; }
+  #mission-next { color: #7fe8a8; font-size: 13px; margin-top: 4px; }
+  /* Strip event kota */
+  #event-strip { display: none; position: absolute; top: 108px; left: 14px; background: rgba(20, 10, 10, 0.78); border-left: 4px solid #ff8a20; color: #ffb060; font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 6px; max-width: 520px; }
+  /* Kanan atas: uang, jam, bintang */
+  #top-right { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #money { font-size: 26px; font-weight: 800; }
+  #day-clock { font-size: 13px; color: #ffd8a8; }
+  #stars { font-size: 22px; letter-spacing: 2px; margin-top: 4px; }
+  #stars .star { color: rgba(255,255,255,0.25); }
+  #stars .star.on { color: #ffe020; text-shadow: 0 0 8px rgba(255,220,32,0.8); }
+  #stars .sight { font-size: 11px; color: #ff6a5a; letter-spacing: 1px; }
+  /* Kiri bawah: minimap + kawasan */
+  #map-wrap { position: absolute; left: 14px; bottom: 14px; }
+  #minimap { width: 180px; height: 180px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.55); background: #22442a; display: block; }
+  #district-label { font-weight: 800; font-size: 14px; margin-top: 6px; text-shadow: 0 1px 3px #000; }
+  #street-label { font-size: 12px; color: #d8d8d8; text-shadow: 0 1px 3px #000; }
+  /* Kanan bawah: kecepatan, kendaraan, health, senjata */
+  #status { position: absolute; right: 14px; bottom: 14px; text-align: right; }
+  #radio-line { color: #7fe8d8; font-size: 13px; pointer-events: auto; cursor: pointer; text-shadow: 0 1px 3px #000; }
+  #speed { font-size: 44px; font-weight: 800; line-height: 1; text-shadow: 0 2px 6px #000; }
+  #speed-unit { font-size: 13px; color: #d8d8d8; }
+  #car-name { font-size: 13px; font-weight: 700; color: #ffe9a0; }
+  #rank-line { font-size: 12px; color: #ffe020; margin-top: 2px; }
+  .bar { width: 220px; height: 10px; background: rgba(0,0,0,0.6); border-radius: 5px; margin: 4px 0 4px auto; overflow: hidden; }
+  .bar > div { height: 100%; }
+  #health-fill { background: #e83a3a; width: 100%; }
+  #armor-fill { background: #6aa8e8; width: 50%; }
+  .bar-label { font-size: 11px; color: #d8d8d8; }
+  #weapon-slots { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+  .wslot { background: rgba(10,10,18,0.72); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 5px 8px; font-size: 11px; min-width: 62px; text-align: center; }
+  .wslot.sel { border-color: #ffe020; background: rgba(60,50,10,0.85); }
+  .wslot.lock { opacity: 0.55; }
+  .wslot span { color: #ffe9a0; }
+  #weapon-now { font-size: 12px; font-weight: 700; margin-top: 4px; }
+  /* Dialog cerita tengah bawah */
+  #dialog { display: none; position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); width: 560px; max-width: 86vw; background: rgba(8,8,16,0.85); border-radius: 10px; padding: 12px 18px; }
+  #dialog-who { color: #ffe020; font-weight: 800; font-size: 13px; }
+  #dialog-text { font-size: 15px; font-style: italic; margin-top: 2px; }
+  /* Toast tengah */
+  #toast { position: absolute; left: 50%; top: 42%; transform: translateX(-50%); background: rgba(8,8,16,0.8); padding: 8px 16px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+  /* Catatan boot + pelapor error */
+  #boot-note { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); background: rgba(8,8,16,0.75); padding: 10px 18px; border-radius: 8px; font-size: 13px; transition: opacity 1.5s; text-align: center; }
+  #err { display: none; position: absolute; left: 14px; top: 170px; background: rgba(120,0,0,0.9); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; max-width: 480px; }
+  #damage-flash { position: fixed; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(220,20,20,0.55) 100%); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  /* Layar menu */
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: linear-gradient(180deg, rgba(20,10,40,0.55), rgba(10,5,20,0.78)); color: #fff; text-align: center; z-index: 10; }
+  .screen h1 { font-size: 64px; font-weight: 900; letter-spacing: 2px; color: #ffe020; text-shadow: 0 4px 24px rgba(255,140,40,0.7); }
+  .screen h2 { font-size: 18px; font-weight: 400; color: #ffd8a8; margin-top: 6px; }
+  .screen p { margin-top: 14px; font-size: 14px; color: #e8e8e8; max-width: 560px; line-height: 1.6; }
+  .screen button { pointer-events: auto; margin-top: 26px; font-size: 18px; font-weight: 800; padding: 14px 42px; border: none; border-radius: 10px; background: #e86a3a; color: #fff; cursor: pointer; }
+  .screen button:hover { background: #f07a4a; }
+  .screen button.ghost { background: transparent; border: 2px solid #fff; font-size: 15px; padding: 10px 28px; }
+  .keys { margin-top: 22px; font-size: 13px; color: #c8c8c8; line-height: 1.9; }
+  .keys b { color: #ffe9a0; }
+  /* Kontrol sentuh */
+  #touch-controls { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #joy-base { position: absolute; left: 26px; bottom: 210px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.35); pointer-events: auto; }
+  #joy-stick { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.45); }
+  .tbtn { position: absolute; pointer-events: auto; width: 74px; height: 74px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); background: rgba(10,10,18,0.55); color: #fff; font-weight: 800; font-size: 14px; }
+  #btn-fire { right: 30px; bottom: 230px; background: rgba(180,30,30,0.65); }
+  #btn-act { right: 120px; bottom: 160px; }
+  #btn-car { right: 30px; bottom: 130px; }
+  @media (max-width: 760px) {
+    .screen h1 { font-size: 38px; }
+    #mission-panel { max-width: 250px; }
+    #minimap { width: 120px; height: 120px; }
+    #speed { font-size: 30px; }
+    .bar { width: 150px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="damage-flash"></div>
+
+<div id="hud">
+  <div id="mission-panel" class="panel">
+    <div id="mission-title">MISSION 1/12 — PESAN PERTAMA</div>
+    <div id="mission-stage">STAGE 1/1</div>
+    <div id="mission-next">Antar Coral GT ke dermaga marina</div>
+  </div>
+  <div id="event-strip"></div>
+  <div id="top-right">
+    <div id="money">$12,480</div>
+    <div id="day-clock">DAY 3&nbsp;&nbsp;17:41</div>
+    <div id="stars"></div>
+  </div>
+  <div id="map-wrap">
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="district-label">Playa Serena</div>
+    <div id="street-label">Boulevard Serena · AMAN</div>
+  </div>
+  <div id="status">
+    <div id="radio-line" title="Ketuk untuk ganti stasiun (M)">♪ Onda Coral 98.7</div>
+    <div><span id="speed">0</span> <span id="speed-unit">KM/H</span></div>
+    <div id="car-name">JALAN KAKI</div>
+    <div id="rank-line">RANK 4 · FIXER&nbsp;&nbsp;&nbsp;640 / 900 RP</div>
+    <div class="bar-label">HEALTH</div>
+    <div class="bar"><div id="health-fill"></div></div>
+    <div class="bar-label">ARMOR</div>
+    <div class="bar"><div id="armor-fill"></div></div>
+    <div id="weapon-slots"></div>
+    <div id="weapon-now">SMG KOBRA</div>
+  </div>
+  <div id="dialog">
+    <div id="dialog-who"></div>
+    <div id="dialog-text"></div>
+  </div>
+  <div id="toast"></div>
+  <div id="boot-note">COSTA VERDE HEAT — kota pantai tropis yang hidup.<br>WASD jalan &amp; mengemudi · E masuk mobil · Klik tembak · 1-4 ganti senjata · M radio · Esc jeda</div>
+  <div id="err"></div>
+</div>
+
+<div id="touch-controls">
+  <div id="joy-base"><div id="joy-stick"></div></div>
+  <button class="tbtn" id="btn-fire">FIRE</button>
+  <button class="tbtn" id="btn-act">ACT</button>
+  <button class="tbtn" id="btn-car">CAR</button>
+</div>
+
+<div id="title-screen" class="screen">
+  <h1>COSTA VERDE HEAT</h1>
+  <h2 id="title-sub">Kota pantai tropis · 12 misi · perang geng · kejar-kejaran polisi</h2>
+  <p>Nico pulang ke Costa Verde — bulevar neon di tepi pantai, palem, dan senja yang tak pernah padam.
+     Antar mobil, menangkan balapan, selamat dari perang geng Caimán dan Víperas, dan berdiri di bawah
+     Tugu Api Emas sebagai penguasa kota.</p>
+  <button id="btn-start">▶ MULAI</button>
+  <div class="keys">
+    <b>WASD / Panah</b> jalan &amp; mengemudi &nbsp;·&nbsp; <b>E</b> masuk / keluar mobil &nbsp;·&nbsp; <b>Klik</b> tembak / pukul<br>
+    <b>1–4</b> ganti senjata &nbsp;·&nbsp; <b>M</b> ganti radio &nbsp;·&nbsp; <b>Shift</b> lari &nbsp;·&nbsp; <b>Esc / P</b> jeda
+  </div>
+</div>
+
+<div id="pause-screen" class="screen">
+  <h1>JEDA</h1>
+  <h2>Nico menunggu di tepi jalan.</h2>
+  <button id="btn-resume">▶ LANJUT</button>
+  <button id="btn-quit" class="ghost">KEMBALI KE JUDUL</button>
+</div>
+
+<div id="end-screen" class="screen">
+  <h1 id="end-title">TAMAT</h1>
+  <h2 id="end-text"></h2>
+  <button id="btn-retry">↻ COBA LAGI</button>
+  <button id="btn-title" class="ghost">KEMBALI KE JUDUL</button>
+</div>
+
+<script>
+/* inlined from game/src/random.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — angka acak berbibit.
+// Satu-satunya sumber keacakan kota ini: dengan bibit yang sama, jalan,
+// gedung, dan keramaian yang muncul selalu sama, jadi adegan bisa diulang
+// persis untuk foto maupun untuk menguji ulang sebuah misi.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.rng = {
+  // Bibit aktif. Nilai awalnya tanggal kota ini pertama kali digambar.
+  s: 20261123,
+
+  // Pasang bibit baru. Dipakai dunia saat membangun kota dan adegan foto
+  // saat meminta susunan pejalan kaki yang sama setiap kali.
+  seed: function (n) {
+    this.s = (n >>> 0) || 1;
+  },
+
+  // Satu angka acak 0..1 dari bibit aktif (mulberry32: kecil, cepat,
+  // dan cukup merata untuk sebuah kota).
+  next: function () {
+    var t = (this.s += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  },
+
+  // Angka acak di antara a dan b.
+  f: function (a, b) {
+    return a + this.next() * (b - a);
+  },
+
+  // Bilangan bulat acak dari a sampai b (keduanya ikut).
+  i: function (a, b) {
+    return a + Math.floor(this.next() * (b - a + 1));
+  },
+
+  // Satu unsur acak dari sebuah daftar.
+  pick: function (list) {
+    return list[Math.floor(this.next() * list.length)];
+  },
+
+  // Benar dengan peluang p (0..1).
+  chance: function (p) {
+    return this.next() < p;
+  },
+
+  // Acak-acak sebuah daftar di tempat dan kembalikan daftar itu.
+  shuffle: function (list) {
+    for (var k = list.length - 1; k > 0; k--) {
+      var j = Math.floor(this.next() * (k + 1));
+      var tmp = list[k];
+      list[k] = list[j];
+      list[j] = tmp;
+    }
+    return list;
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/world.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — peta kota.
+// Costa Verde adalah kota pantai tropis fiktif: bulevar neon di tepi laut,
+// plaza dengan monumen api emas di tengah, dermaga, bianglala, mercusuar,
+// dan blok-blok bangunan hangat di bawah langit senja. Semua yang ada di
+// sini digambar dari bibit yang sama, jadi kotanya selalu sama bentuknya.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.world = {
+  // Setengah lebar kota. Di luar garis ini ada pagar tak terlihat.
+  BOUND: 1150,
+  // Garis pantai: pasir mulai di sini, laut di ujung timur.
+  BEACH_X: 1020,
+  SEA_X: 1130,
+
+  roads: [],
+  buildings: [],
+  palms: [],
+  lamps: [],
+  shops: [],
+  parks: [],
+  crossings: [],
+
+  // Sumbu jalan: tujuh jalan vertikal dan tujuh jalan horizontal.
+  AXES: [-900, -600, -300, 0, 300, 600, 900],
+
+  plaza: { x: 0, y: 0, r: 150 },
+  monument: { x: 0, y: 0, r: 20 },
+  pier: { x: 1080, y: -300, len: 130, w: 46 },
+  ferris: { x: 1046, y: -470, r: 64 },
+  lighthouse: { x: 1090, y: 620, r: 26 },
+  garageSpot: { x: -600, y: 600 },
+
+  // Nama jalan dan toko — semuanya karangan sendiri.
+  AVENUE_NAMES: [
+    'Avenida Palma',
+    'Calle Verde',
+    'Avenida Coral',
+    'Boulevard Serena',
+    'Calle Luna',
+    'Avenida Brisa',
+    'Calle Faro',
+  ],
+  SHOP_NAMES: [
+    'Toko Marisol',
+    'Café Brisa',
+    'La Palma Market',
+    'Taller Rayo',
+    'Hotel Coral',
+    'Farmacia Luna',
+    'Panadería Sol',
+    'Tienda Nico',
+    'Ropa Serena',
+    'Heladería Ola',
+  ],
+  BUILDING_COLORS: [
+    '#c98f6b', '#b97f7a', '#8fa3b8', '#d9a066', '#7d8aa0',
+    '#e0b48f', '#a87f95', '#6f8f7a', '#c4a06a', '#9a7fa8',
+  ],
+
+  // Bangun seluruh kota dari bibit. Dipanggil sekali saat boot.
+  build: function () {
+    var rng = CVH.rng;
+    rng.seed(20261123);
+    var axes = this.AXES;
+    var i, j;
+
+    // Jalan vertikal (kecuali bulevar, namanya sendiri) dan horizontal.
+    for (i = 0; i < axes.length; i++) {
+      this.roads.push({
+        v: true, x: axes[i], y1: -this.BOUND, y2: this.BOUND, w: 84,
+        name: axes[i] === 900 ? 'Boulevard Serena' : this.AVENUE_NAMES[i % this.AVENUE_NAMES.length],
+      });
+      this.roads.push({
+        v: false, y: axes[i], x1: -this.BOUND, x2: this.BOUND, w: 84,
+        name: axes[i] === 0 ? 'Avenida Central' : this.AVENUE_NAMES[(i + 2) % this.AVENUE_NAMES.length],
+      });
+    }
+    // Titik persimpangan: tempat lalu lintas melambat dan berbelok.
+    for (i = 0; i < axes.length; i++) {
+      for (j = 0; j < axes.length; j++) {
+        this.crossings.push({ x: axes[i], y: axes[j] });
+      }
+    }
+
+    // Blok bangunan di antara jalan. Tiap sel diisi 1-3 gedung, atau
+    // taman kecil dengan palem bila undian berkata begitu.
+    var cellCenters = [-750, -450, -150, 150, 450, 750];
+    for (i = 0; i < cellCenters.length; i++) {
+      for (j = 0; j < cellCenters.length; j++) {
+        var cx = cellCenters[i];
+        var cy = cellCenters[j];
+        // Plaza pusat: kosong, hanya monumen dan lampu taman.
+        if (Math.abs(cx) < 200 && Math.abs(cy) < 200) continue;
+        if (rng.chance(0.14)) {
+          this.parks.push({ x: cx, y: cy, r: 110 });
+          for (var p = 0; p < 7; p++) {
+            this.palms.push({ x: cx + rng.f(-90, 90), y: cy + rng.f(-90, 90), s: rng.f(0.8, 1.3) });
+          }
+          continue;
+        }
+        var hotel = cx > 600; // kolom timur: hotel-hotel tinggi tepi pantai
+        var count = rng.i(1, 3);
+        for (var k = 0; k < count; k++) {
+          var w = rng.f(90, 170);
+          var d = rng.f(90, 170);
+          var bx = cx + (count === 1 ? 0 : rng.f(-70, 70));
+          var by = cy + (count === 1 ? 0 : rng.f(-70, 70));
+          var h = hotel ? rng.f(150, 260) : rng.f(45, 150);
+          var shop = Math.abs(cx) === 750 || rng.chance(0.22);
+          var b = {
+            x: bx, y: by, w: w, d: d, h: h,
+            c: rng.pick(this.BUILDING_COLORS),
+            roof: rng.pick(['#5a4632', '#6b4a3a', '#3f4a55', '#7a5a40']),
+            shop: shop,
+            name: shop ? rng.pick(this.SHOP_NAMES) : '',
+          };
+          this.buildings.push(b);
+          if (shop) this.shops.push(b);
+        }
+      }
+    }
+
+    // Palem di sepanjang bulevar dan garis pantai.
+    for (var y = -1050; y <= 1050; y += 120) {
+      this.palms.push({ x: 968 + rng.f(-6, 6), y: y, s: rng.f(0.9, 1.4) });
+      this.palms.push({ x: 1040 + rng.f(-8, 8), y: y + 60, s: rng.f(0.8, 1.2) });
+      if (rng.chance(0.5)) this.palms.push({ x: -968 + rng.f(-6, 6), y: y, s: rng.f(0.9, 1.3) });
+    }
+    // Lampu jalan di setiap persimpangan dan sepanjang bulevar.
+    for (i = 0; i < this.crossings.length; i++) {
+      var c = this.crossings[i];
+      this.lamps.push({ x: c.x + 52, y: c.y + 52 });
+    }
+    for (y = -1000; y <= 1000; y += 200) {
+      this.lamps.push({ x: 852, y: y });
+    }
+  },
+
+  // Apakah titik (x, y) tertabrak gedung, monumen, atau pagar kota?
+  // Dipakai pejalan kaki, mobil, dan pemain — titik tengah gedung pun
+  // tertolak, bukan cuma tepinya.
+  isBlocked: function (x, y, r) {
+    r = r || 0;
+    if (Math.abs(x) > this.BOUND - r || Math.abs(y) > this.BOUND - r) return true;
+    // Monumen di tengah plaza: lingkaran, bukan kotak.
+    var mdx = x - this.monument.x;
+    var mdy = y - this.monument.y;
+    if (mdx * mdx + mdy * mdy < (this.monument.r + r) * (this.monument.r + r)) return true;
+    // Mercusuar juga bundar.
+    var ldx = x - this.lighthouse.x;
+    var ldy = y - this.lighthouse.y;
+    if (ldx * ldx + ldy * ldy < (this.lighthouse.r + r) * (this.lighthouse.r + r)) return true;
+    for (var i = 0; i < this.buildings.length; i++) {
+      var b = this.buildings[i];
+      if (Math.abs(x - b.x) < b.w / 2 + r && Math.abs(y - b.y) < b.d / 2 + r) return true;
+    }
+    return false;
+  },
+
+  // Apakah titik ini di atas aspal jalan?
+  onRoad: function (x, y) {
+    for (var i = 0; i < this.roads.length; i++) {
+      var r = this.roads[i];
+      if (r.v) {
+        if (Math.abs(x - r.x) <= r.w / 2 && y >= r.y1 && y <= r.y2) return true;
+      } else {
+        if (Math.abs(y - r.y) <= r.w / 2 && x >= r.x1 && x <= r.x2) return true;
+      }
+    }
+    return false;
+  },
+
+  // Jalan terdekat dari sebuah titik, beserta jaraknya.
+  nearestRoad: function (x, y) {
+    var best = null;
+    var bestD = 1e9;
+    for (var i = 0; i < this.roads.length; i++) {
+      var r = this.roads[i];
+      var d;
+      if (r.v) d = Math.abs(x - r.x);
+      else d = Math.abs(y - r.y);
+      if (d < bestD) {
+        bestD = d;
+        best = r;
+      }
+    }
+    return { road: best, dist: bestD };
+  },
+
+  // Titik acak di atas jalan (untuk memunculkan mobil lalu lintas).
+  randomRoadPoint: function () {
+    var rng = CVH.rng;
+    var r = rng.pick(this.roads);
+    if (r.v) return { x: r.x + rng.f(-20, 20), y: rng.f(r.y1 + 60, r.y2 - 60), road: r };
+    return { x: rng.f(r.x1 + 60, r.x2 - 60), y: r.y + rng.f(-20, 20), road: r };
+  },
+
+  // Persimpangan terdekat dari sebuah titik.
+  nearestCrossing: function (x, y) {
+    var best = this.crossings[0];
+    var bestD = 1e18;
+    for (var i = 0; i < this.crossings.length; i++) {
+      var c = this.crossings[i];
+      var d = (c.x - x) * (c.x - x) + (c.y - y) * (c.y - y);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best;
+  },
+
+  // Nama kawasan berdasarkan letak: dipakai HUD dan minimap.
+  district: function (x, y) {
+    if (x > 700) return 'Playa Serena';
+    if (y < -700) return 'Marina Norte';
+    if (y > 700) return 'Puerto Azul';
+    if (x < -700) return 'Barrio Verde';
+    if (Math.abs(x) < 220 && Math.abs(y) < 220) return 'Plaza Api Emas';
+    return 'Centro';
+  },
+
+  // Nama jalan terdekat, untuk label kecil di HUD.
+  streetName: function (x, y) {
+    var n = this.nearestRoad(x, y);
+    return n.road ? n.road.name : 'Costa Verde';
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/vehicles.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — kendaraan.
+// Model-model mobil orisinal kota ini: sport Coral GT merah untuk misi
+// pertama, coupe biru Brisa Coupé untuk promosi, plus sedan, taksi, van,
+// truk, dan mobil patroli PMCV. Satu daftar dipakai pemain, lalu lintas,
+// dan polisi — bedanya hanya siapa yang memegang kemudi.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.vehicles = {
+  list: [],
+  nextId: 1,
+
+  // Ciri tiap model: panjang, lebar, tenaga, dan kecepatan puncaknya.
+  defs: {
+    coral:  { name: 'Coral GT',     len: 52, wid: 26, accel: 150, top: 320, color: '#d8322a', sport: true },
+    brisa:  { name: 'Brisa Coupé',  len: 50, wid: 25, accel: 130, top: 290, color: '#2a6fd8', sport: true },
+    sedan:  { name: 'Serena Sedan', len: 50, wid: 25, accel: 95,  top: 210, color: '#c8c0b4', sport: false },
+    taxi:   { name: 'Taxi Ola',     len: 50, wid: 25, accel: 100, top: 220, color: '#e8b820', sport: false },
+    van:    { name: 'Van Kargo',    len: 58, wid: 27, accel: 75,  top: 170, color: '#7a8a94', sport: false },
+    truck:  { name: 'Truk Pelabuhan', len: 72, wid: 30, accel: 60, top: 150, color: '#a8542e', sport: false },
+    police: { name: 'PMCV Interceptor', len: 52, wid: 26, accel: 140, top: 300, color: '#1c2a44', sport: true },
+  },
+
+  // Buat satu mobil dan daftarkan. `owner` menentukan siapa mengendalikannya:
+  // 'player', 'traffic', 'police', 'parked', atau 'mission'.
+  make: function (defName, x, y, a, owner) {
+    var def = this.defs[defName] || this.defs.sedan;
+    var car = {
+      id: this.nextId++,
+      def: defName,
+      name: def.name,
+      x: x, y: y, a: a || 0,
+      speed: 0, steer: 0,
+      len: def.len, wid: def.wid,
+      color: def.color,
+      owner: owner || 'parked',
+      hp: 100, dead: false,
+      // Bidang khusus lalu lintas / polisi, diisi modul lain.
+      road: null, along: 0, dir: 1, lane: 0, targetSpeed: 0,
+      siren: false, lightPhase: 0,
+    };
+    this.list.push(car);
+    return car;
+  },
+
+  // Parkir beberapa mobil di tepi jalan untuk dicuri pemain.
+  spawnParked: function (n) {
+    var rng = CVH.rng;
+    var keys = ['sedan', 'brisa', 'sedan', 'taxi', 'van', 'coral'];
+    for (var i = 0; i < n; i++) {
+      var p = CVH.world.randomRoadPoint();
+      var angle = p.road.v ? (rng.chance(0.5) ? Math.PI / 2 : -Math.PI / 2) : (rng.chance(0.5) ? 0 : Math.PI);
+      // Geser ke tepi jalan supaya tidak menghalangi lajur.
+      var px = p.x + (p.road.v ? 30 : 0);
+      var py = p.y + (p.road.v ? 0 : 30);
+      if (CVH.world.isBlocked(px, py, 30)) continue;
+      this.make(rng.pick(keys), px, py, angle, 'parked');
+    }
+  },
+
+  // Mobil terdekat dari sebuah titik (dalam radius r, apa pun pemiliknya).
+  nearest: function (x, y, r, skip) {
+    var best = null;
+    var bestD = r * r;
+    for (var i = 0; i < this.list.length; i++) {
+      var c = this.list[i];
+      if (c === skip || c.dead) continue;
+      var dx = c.x - x;
+      var dy = c.y - y;
+      var d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best;
+  },
+
+  // Fisika satu mobil: gas, rem, belok, gesekan, dan tabrakan gedung.
+  // `drive` berisi gas (-1..1) dan steer (-1..1). Mengembalikan apakah
+  // mobil menabrak sesuatu keras-keras (untuk bunyi dan kerusakan).
+  step: function (car, drive, dt) {
+    var def = this.defs[car.def];
+    var crashed = false;
+    if (drive.gas > 0) car.speed += def.accel * drive.gas * dt;
+    else if (drive.gas < 0) car.speed += def.accel * 1.4 * drive.gas * dt;
+    else {
+      // Tanpa gas, mobil melambat sendiri sampai berhenti.
+      var drag = 60 * dt;
+      if (car.speed > drag) car.speed -= drag;
+      else if (car.speed < -drag) car.speed += drag;
+      else car.speed = 0;
+    }
+    if (car.speed > def.top) car.speed = def.top;
+    if (car.speed < -70) car.speed = -70;
+    // Belok makin sulit di kecepatan tinggi; mundur membalik arah belok.
+    var turn = drive.steer * (car.speed >= 0 ? 1 : -1) * 1.9 * dt;
+    turn *= Math.min(1, Math.abs(car.speed) / 60 + 0.25);
+    car.a += turn;
+    var nx = car.x + Math.cos(car.a) * car.speed * dt;
+    var ny = car.y + Math.sin(car.a) * car.speed * dt;
+    // Tabrakan gedung: mobil berhenti, sedikit terpental, bodi penyok.
+    if (CVH.world.isBlocked(nx, ny, car.len * 0.42)) {
+      if (Math.abs(car.speed) > 120) {
+        crashed = true;
+        car.hp -= Math.abs(car.speed) * 0.08;
+        CVH.audio.crash();
+      }
+      car.speed *= -0.25;
+      nx = car.x;
+      ny = car.y;
+    }
+    car.x = nx;
+    car.y = ny;
+    car.lightPhase += dt * 6;
+    return crashed;
+  },
+
+  // Dorong mobil-mobil yang saling menempel supaya tidak menumpuk.
+  separate: function () {
+    var list = this.list;
+    for (var i = 0; i < list.length; i++) {
+      for (var j = i + 1; j < list.length; j++) {
+        var a = list[i];
+        var b = list[j];
+        if (a.dead || b.dead) continue;
+        var dx = b.x - a.x;
+        var dy = b.y - a.y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        var min = (a.len + b.len) * 0.42;
+        if (d > 0.01 && d < min) {
+          var push = (min - d) / 2;
+          var ux = dx / d;
+          var uy = dy / d;
+          a.x -= ux * push;
+          a.y -= uy * push;
+          b.x += ux * push;
+          b.y += uy * push;
+          if (Math.abs(a.speed) > 60 || Math.abs(b.speed) > 60) {
+            a.speed *= 0.7;
+            b.speed *= 0.7;
+          }
+        }
+      }
+    }
+  },
+
+  // Buang mobil yang sudah hancur dari daftar (dipanggil berkala).
+  sweep: function () {
+    this.list = this.list.filter(function (c) {
+      return !c.dead || c.hp > -80;
+    });
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/traffic.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — lalu lintas.
+// Mobil-mobil AI yang sadar lajur: mereka melaju di lajur kanan sesuai
+// arah jalan, melambat sebelum persimpangan, kembali ke aspal bila
+// terseret keluar, mengerem penuh bila ada pejalan kaki atau pemain di
+// depan, dan menjaga jarak dengan mobil di depannya.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.traffic = {
+  // Berapa mobil lalu lintas yang hidup di kota.
+  COUNT: 16,
+
+  // Sebar mobil lalu lintas ke seluruh kota.
+  spawn: function (n) {
+    var rng = CVH.rng;
+    var keys = ['sedan', 'taxi', 'van', 'sedan', 'truck', 'brisa'];
+    for (var i = 0; i < n; i++) {
+      var p = CVH.world.randomRoadPoint();
+      var road = p.road;
+      var dir = rng.chance(0.5) ? 1 : -1;
+      var car = CVH.vehicles.make(rng.pick(keys), p.x, p.y, 0, 'traffic');
+      car.road = road;
+      car.dir = dir;
+      // Lajur kanan: di jalan vertikal yang menghadap selatan, kanan
+      // adalah barat; di jalan horizontal yang menghadap timur, kanan
+      // adalah selatan. Rumus ini menaruh mobil di sisi kanannya.
+      car.lane = road.v ? -21 * dir : 21 * dir;
+      car.a = road.v ? (dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (dir > 0 ? 0 : Math.PI);
+      car.along = road.v ? p.y : p.x;
+      car.speed = rng.f(40, 80);
+      car.targetSpeed = rng.f(55, 85);
+    }
+  },
+
+  // Ada rintangan di depan mobil ini? Cek pejalan kaki, pemain, dan
+  // mobil lain dalam kerucut pendek di depan moncong.
+  blockedAhead: function (car) {
+    var fx = car.x + Math.cos(car.a) * 58;
+    var fy = car.y + Math.sin(car.a) * 58;
+    var S = CVH.S;
+    // Pemain jalan kaki di depan: rem penuh.
+    if (!S.player.car) {
+      var pdx = S.player.x - fx;
+      var pdy = S.player.y - fy;
+      if (pdx * pdx + pdy * pdy < 30 * 30) return true;
+    }
+    // Pejalan kaki di depan: rem penuh.
+    var peds = CVH.peds.list;
+    for (var i = 0; i < peds.length; i++) {
+      var p = peds[i];
+      if (p.state === 'dead') continue;
+      var dx = p.x - fx;
+      var dy = p.y - fy;
+      if (dx * dx + dy * dy < 26 * 26) return true;
+    }
+    // Mobil lain terlalu dekat di depan: jaga jarak.
+    var cars = CVH.vehicles.list;
+    for (var j = 0; j < cars.length; j++) {
+      var o = cars[j];
+      if (o === car || o.dead) continue;
+      var ox = o.x - fx;
+      var oy = o.y - fy;
+      if (ox * ox + oy * oy < 30 * 30) return true;
+    }
+    return false;
+  },
+
+  // Satu langkah simulasi untuk semua mobil lalu lintas.
+  update: function (dt) {
+    var cars = CVH.vehicles.list;
+    var axes = CVH.world.AXES;
+    for (var i = 0; i < cars.length; i++) {
+      var car = cars[i];
+      if (car.owner !== 'traffic' || car.dead) continue;
+      var road = car.road;
+      if (!road) continue;
+
+      // Titik yang dituju: sumbu jalan + lajur kanan, sedikit di depan.
+      var along = car.along + car.dir * 60;
+      var tx, ty;
+      if (road.v) {
+        tx = road.x + car.lane;
+        ty = along;
+      } else {
+        tx = along;
+        ty = road.y + car.lane;
+      }
+      // Bila mobil terseret keluar aspal (misalnya ditabrak), target
+      // kembali ke titik jalan terdekat sampai ia menemukan aspal lagi.
+      if (!CVH.world.onRoad(car.x, car.y)) {
+        var near = CVH.world.nearestRoad(car.x, car.y);
+        if (near.road.v) {
+          tx = near.road.x;
+          ty = car.y;
+        } else {
+          tx = car.x;
+          ty = near.road.y;
+        }
+      }
+
+      // Kecepatan target: melambat sebelum persimpangan.
+      var target = car.targetSpeed;
+      var cross = CVH.world.nearestCrossing(car.x, car.y);
+      var cdx = cross.x - car.x;
+      var cdy = cross.y - car.y;
+      var crossDist = Math.sqrt(cdx * cdx + cdy * cdy);
+      if (crossDist < 90) target = Math.min(target, 42);
+      if (this.blockedAhead(car)) target = 0;
+
+      // Kemudi: putar perlahan menuju titik tujuan.
+      var want = Math.atan2(ty - car.y, tx - car.x);
+      var diff = want - car.a;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      var steer = Math.max(-1, Math.min(1, diff * 2.2));
+      var gas = car.speed < target ? 1 : (car.speed > target + 6 ? -0.7 : 0);
+      CVH.vehicles.step(car, { gas: gas, steer: steer }, dt);
+      car.along = road.v ? car.y : car.x;
+
+      // Sampai di persimpangan: kadang belok ke jalan yang bersilangan.
+      if (crossDist < 26) {
+        var rng = CVH.rng;
+        if (rng.chance(0.38)) {
+          var other;
+          if (road.v) {
+            other = { v: false, y: cross.y, x1: -1150, x2: 1150, w: 84, name: 'Calle' };
+          } else {
+            other = { v: true, x: cross.x, y1: -1150, y2: 1150, w: 84, name: 'Avenida' };
+          }
+          car.road = other;
+          car.dir = rng.chance(0.5) ? 1 : -1;
+          car.lane = other.v ? -21 * car.dir : 21 * car.dir;
+          car.a = other.v ? (car.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (car.dir > 0 ? 0 : Math.PI);
+        } else {
+          // Lurus: lewati persimpangan dengan sedikit acak kecepatan.
+          car.targetSpeed = rng.f(55, 85);
+        }
+      }
+      // Bila entah bagaimana keluar dari ujung jalan, putar balik.
+      if (road.v && (car.y < -1100 || car.y > 1100)) car.dir *= -1;
+      if (!road.v && (car.x < -1100 || car.x > 1100)) car.dir *= -1;
+    }
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/pedestrians.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — pejalan kaki.
+// Warga kota yang berjalan di trotoar: tiap orang punya wajah lengkap
+// (mata, alis, hidung, mulut, rambut, warna kulitnya sendiri) dan sekitar
+// separuhnya perempuan. Mereka menepi saat mobil mendekat dan kabur
+// bila ada bahaya — tembakan, tabrakan, atau polisi yang mengejar.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.peds = {
+  list: [],
+  COUNT: 26,
+
+  SKINS: ['#e8b98d', '#c98d5f', '#a06a42', '#f0cba0', '#8a5a34', '#d9a06a'],
+  HAIRS: ['#1c1410', '#3a2a18', '#6b4a22', '#8a8a8a', '#c9a227', '#4a2a1a'],
+  SHIRTS: ['#d84a4a', '#3a7ad8', '#3aa85c', '#e8b820', '#8a5ad8', '#e8e8e8', '#2a2a2a', '#d87a3a'],
+  PANTS: ['#2a3a55', '#3a3a3a', '#5a4a3a', '#6a7a8a', '#402a55'],
+
+  // Buat satu warga di titik tertentu. `opts` bisa memaksa jenisnya
+  // (polisi, geng Caimán, geng Víperas, atau pendamping Rayo).
+  make: function (x, y, opts) {
+    var rng = CVH.rng;
+    opts = opts || {};
+    var female = opts.female !== undefined ? opts.female : rng.chance(0.5);
+    var p = {
+      x: x, y: y, a: rng.f(0, Math.PI * 2),
+      speed: rng.f(28, 52),
+      female: female,
+      skin: rng.pick(this.SKINS),
+      hair: rng.pick(this.HAIRS),
+      hairLong: female && rng.chance(0.7),
+      hairStyle: rng.i(0, 3), // 0 pendek, 1 jambul, 2 ikat, 3 topi
+      shirt: opts.shirt || rng.pick(this.SHIRTS),
+      pants: rng.pick(this.PANTS),
+      state: 'walk', // walk | flee | idle | dead
+      tx: x, ty: y, // tujuan jalan kaki
+      wait: 0,
+      panic: 0,
+      hp: 100,
+      gang: opts.gang || null,
+      police: !!opts.police,
+      rayo: !!opts.rayo,
+      name: opts.name || '',
+      deadT: 0,
+      stepPhase: rng.f(0, 6),
+    };
+    if (p.police) {
+      p.shirt = '#1c2a44';
+      p.pants = '#1c2a44';
+      p.hairStyle = 3;
+      p.female = false;
+    }
+    if (p.gang === 'caiman') p.shirt = '#2a7a3a';
+    if (p.gang === 'viperas') p.shirt = '#7a2a5a';
+    if (p.rayo) {
+      p.shirt = '#d8a020';
+      p.name = 'Bruno "Rayo" Cárdenas';
+    }
+    this.list.push(p);
+    return p;
+  },
+
+  // Sebar warga ke trotoar-trotoar kota.
+  spawn: function (n) {
+    var rng = CVH.rng;
+    for (var i = 0; i < n; i++) {
+      var p = CVH.world.randomRoadPoint();
+      // Trotoar: 58 unit dari sumbu jalan.
+      var x = p.x + (p.road.v ? 58 : rng.f(-40, 40));
+      var y = p.y + (p.road.v ? rng.f(-40, 40) : 58);
+      if (CVH.world.isBlocked(x, y, 12)) continue;
+      this.make(x, y, {});
+    }
+  },
+
+  // Warga terdekat dari titik ini (untuk tembakan dan misi).
+  nearest: function (x, y, r, filter) {
+    var best = null;
+    var bestD = r * r;
+    for (var i = 0; i < this.list.length; i++) {
+      var p = this.list[i];
+      if (p.state === 'dead') continue;
+      if (filter && !filter(p)) continue;
+      var dx = p.x - x;
+      var dy = p.y - y;
+      var d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best;
+  },
+
+  // Buat semua warga dalam radius lari ketakutan dari sebuah bahaya.
+  scare: function (x, y, r) {
+    for (var i = 0; i < this.list.length; i++) {
+      var p = this.list[i];
+      if (p.state === 'dead' || p.police) continue;
+      var dx = p.x - x;
+      var dy = p.y - y;
+      if (dx * dx + dy * dy < r * r) {
+        p.state = 'flee';
+        p.panic = 2.5;
+        p.tx = p.x + dx * 3;
+        p.ty = p.y + dy * 3;
+      }
+    }
+  },
+
+  update: function (dt) {
+    var S = CVH.S;
+    var rng = CVH.rng;
+    for (var i = 0; i < this.list.length; i++) {
+      var p = this.list[i];
+      if (p.state === 'dead') {
+        p.deadT += dt;
+        continue;
+      }
+      p.stepPhase += dt * 7;
+      // Pendamping Rayo mengikuti pemain ke mana pun ia pergi.
+      if (p.rayo && S) {
+        var pdx = S.player.x - p.x;
+        var pdy = S.player.y - p.y;
+        var pd = Math.sqrt(pdx * pdx + pdy * pdy);
+        if (pd > 70) {
+          p.a = Math.atan2(pdy, pdx);
+          p.x += Math.cos(p.a) * 95 * dt;
+          p.y += Math.sin(p.a) * 95 * dt;
+        }
+        continue;
+      }
+      // Polisi jalan kaki mengejar pemain bila wanted sedang panas.
+      if (p.police && S && S.wanted > 0) {
+        var qdx = S.player.x - p.x;
+        var qdy = S.player.y - p.y;
+        var qd = Math.sqrt(qdx * qdx + qdy * qdy);
+        if (qd < 420 && !S.player.car) {
+          p.a = Math.atan2(qdy, qdx);
+          p.x += Math.cos(p.a) * 105 * dt;
+          p.y += Math.sin(p.a) * 105 * dt;
+          // Menangkap: berdiri cukup dekat cukup lama berarti tamat.
+          if (qd < 16) {
+            S.arrestT = (S.arrestT || 0) + dt;
+            if (S.arrestT > 1.6) CVH.menus.end(false, 'Ditangkap PMCV di ' + CVH.world.district(p.x, p.y) + '.');
+          }
+          continue;
+        }
+      }
+      if (p.state === 'flee') {
+        p.panic -= dt;
+        var fx = p.tx - p.x;
+        var fy = p.ty - p.y;
+        var fd = Math.sqrt(fx * fx + fy * fy);
+        if (fd > 4) {
+          p.a = Math.atan2(fy, fx);
+          p.x += Math.cos(p.a) * 130 * dt;
+          p.y += Math.sin(p.a) * 130 * dt;
+        }
+        if (p.panic <= 0) p.state = 'walk';
+        continue;
+      }
+      // Mobil mendekat dari depan: menepi ke samping, menjauh dari aspal.
+      var near = CVH.vehicles.nearest(p.x, p.y, 46, null);
+      if (near && Math.abs(near.speed) > 25) {
+        var ndx = p.x - near.x;
+        var ndy = p.y - near.y;
+        var nd = Math.sqrt(ndx * ndx + ndy * ndy) || 1;
+        p.x += (ndx / nd) * 70 * dt;
+        p.y += (ndy / nd) * 70 * dt;
+        p.a = Math.atan2(ndy, ndx);
+        continue;
+      }
+      // Jalan santai menuju tujuan; sampai di sana, pilih tujuan baru
+      // di trotoar sepanjang jalan yang sama.
+      var dx = p.tx - p.x;
+      var dy = p.ty - p.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 12 || p.wait > 0) {
+        p.wait -= dt;
+        if (p.wait <= 0) {
+          var road = CVH.world.nearestRoad(p.x, p.y).road;
+          var along = rng.f(-260, 260);
+          if (road.v) {
+            p.tx = road.x + (rng.chance(0.5) ? 58 : -58);
+            p.ty = p.y + along;
+          } else {
+            p.tx = p.x + along;
+            p.ty = road.y + (rng.chance(0.5) ? 58 : -58);
+          }
+          p.wait = rng.chance(0.25) ? rng.f(1, 4) : 0;
+        }
+        continue;
+      }
+      p.a = Math.atan2(dy, dx);
+      var nx = p.x + Math.cos(p.a) * p.speed * dt;
+      var ny = p.y + Math.sin(p.a) * p.speed * dt;
+      if (!CVH.world.isBlocked(nx, ny, 10)) {
+        p.x = nx;
+        p.y = ny;
+      } else {
+        p.tx = p.x + rng.f(-200, 200);
+        p.ty = p.y + rng.f(-200, 200);
+      }
+    }
+    // Bersihkan warga yang sudah lama tergeletak.
+    this.list = this.list.filter(function (p) {
+      return p.state !== 'dead' || p.deadT < 8;
+    });
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/player.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — pemain.
+// Nico, sang tokoh utama: berjalan kaki di trotoar dan plaza, masuk dan
+// mencuri mobil dengan tombol aksi, mengemudi dengan gas dan rem, dan
+// membawa health, armor, serta uang hasil misi. Progresnya tersimpan
+// lewat modul savegame.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.player = {
+  WALK_SPEED: 105,
+  RUN_SPEED: 165,
+
+  // Posisi awal pemain: di plaza, menghadap bulevar.
+  reset: function () {
+    var S = CVH.S;
+    S.player.x = 60;
+    S.player.y = 140;
+    S.player.a = -Math.PI / 2;
+    S.player.hp = 100;
+    S.player.armor = 50;
+    S.player.money = 12480;
+    S.player.car = null;
+    S.player.weapon = 2;
+    S.player.ammo = [Infinity, 84, 132, 18];
+    S.player.kills = 0;
+    S.player.speed = 0;
+  },
+
+  // Masuk ke mobil terdekat (atau mencurinya bila ada pengemudi).
+  tryEnterCar: function () {
+    var S = CVH.S;
+    if (S.player.car) {
+      this.exitCar();
+      return;
+    }
+    var car = CVH.vehicles.nearest(S.player.x, S.player.y, 70, null);
+    if (!car) {
+      CVH.hud.toast('Tidak ada mobil di dekat sini.');
+      return;
+    }
+    // Mobil lalu lintas yang dicuri: pengemudinya kabur, wanted naik.
+    if (car.owner === 'traffic') {
+      car.owner = 'player';
+      CVH.police.addHeat(12, 'curi mobil');
+      CVH.hud.toast('Mobil dicuri — ' + car.name + '!');
+    } else {
+      car.owner = 'player';
+      CVH.hud.toast(car.name + ' — kunci sudah di tangan.');
+    }
+    S.player.car = car;
+    car.speed = 0;
+    CVH.audio.click();
+  },
+
+  // Keluar dari mobil: pemain berdiri di samping pintu.
+  exitCar: function () {
+    var S = CVH.S;
+    var car = S.player.car;
+    if (!car) return;
+    var side = car.a + Math.PI / 2;
+    var nx = car.x + Math.cos(side) * 34;
+    var ny = car.y + Math.sin(side) * 34;
+    if (!CVH.world.isBlocked(nx, ny, 12)) {
+      S.player.x = nx;
+      S.player.y = ny;
+    } else {
+      S.player.x = car.x - Math.cos(side) * 34;
+      S.player.y = car.y - Math.sin(side) * 34;
+    }
+    S.player.a = car.a;
+    car.owner = 'parked';
+    car.speed = 0;
+    S.player.car = null;
+    CVH.audio.click();
+  },
+
+  // Terima damage: armor menahan dulu, baru health.
+  hurt: function (n) {
+    var S = CVH.S;
+    if (S.mode !== 'play' || S.god) return;
+    var rest = n;
+    if (S.player.armor > 0) {
+      var absorbed = Math.min(S.player.armor, rest);
+      S.player.armor -= absorbed;
+      rest -= absorbed;
+    }
+    S.player.hp -= rest;
+    CVH.hud.flashDamage();
+    if (S.player.hp <= 0) {
+      S.player.hp = 0;
+      CVH.menus.end(false, 'Nico tumbang di ' + CVH.world.district(S.player.x, S.player.y) + '.');
+    }
+  },
+
+  addCash: function (n) {
+    CVH.S.player.money += n;
+    CVH.hud.toast('+$' + n.toLocaleString('en-US'));
+  },
+
+  update: function (dt) {
+    var S = CVH.S;
+    if (S.mode !== 'play' || S.paused) return;
+    var input = CVH.input;
+    var ax = input.axis();
+    var p = S.player;
+
+    if (p.car) {
+      // Mengemudi: gas/rem dari sumbu maju, belok dari sumbu samping.
+      // Cruise (adegan foto) menahan gas supaya mobil terus melaju.
+      var gas = -ax.y;
+      if (S.cruise) gas = Math.max(gas, 0.55);
+      var steer = ax.x;
+      var crashed = CVH.vehicles.step(p.car, { gas: gas, steer: steer }, dt);
+      p.x = p.car.x;
+      p.y = p.car.y;
+      p.a = p.car.a;
+      p.speed = p.car.speed;
+      if (crashed) this.hurt(6);
+      // Tabrak pejalan kaki: warga terpental dan wanted naik.
+      var hit = CVH.peds.nearest(p.car.x, p.car.y, 34, function (w) {
+        return w.state !== 'dead' && !w.police;
+      });
+      if (hit && Math.abs(p.car.speed) > 40) {
+        hit.state = 'dead';
+        hit.hp = 0;
+        CVH.police.addHeat(16, 'tabrak warga');
+        CVH.peds.scare(p.car.x, p.car.y, 160);
+      }
+      CVH.audio.engine(true, Math.abs(p.car.speed));
+    } else {
+      // Jalan kaki: bergerak mengikuti arah kamera.
+      var cam = S.cam;
+      var run = input.keys['ShiftLeft'] || input.keys['ShiftRight'];
+      var speed = run ? this.RUN_SPEED : this.WALK_SPEED;
+      var mx = 0;
+      var my = 0;
+      if (ax.x !== 0 || ax.y !== 0) {
+        var fx = Math.cos(cam.yaw);
+        var fy = Math.sin(cam.yaw);
+        var rx = -fy;
+        var ry = fx;
+        mx = fx * -ax.y + rx * ax.x;
+        my = fy * -ax.y + ry * ax.x;
+        var len = Math.sqrt(mx * mx + my * my) || 1;
+        mx /= len;
+        my /= len;
+      }
+      var nx = p.x + mx * speed * dt;
+      var ny = p.y + my * speed * dt;
+      if (!CVH.world.isBlocked(nx, p.y, 13)) p.x = nx;
+      if (!CVH.world.isBlocked(p.x, ny, 13)) p.y = ny;
+      if (mx !== 0 || my !== 0) p.a = Math.atan2(my, mx);
+      p.speed = (mx !== 0 || my !== 0) ? speed : 0;
+      CVH.audio.engine(false, 0);
+      // Berdiri di trotoar dekat mobil lalu tekan aksi untuk masuk.
+      if (input.pressed('KeyE') || input.actPressed) this.tryEnterCar();
+    }
+    // Menyelam ke laut? Tidak bisa — pasir pantai menahan langkah.
+    if (p.x > CVH.world.SEA_X - 10 && !p.car) {
+      p.x = CVH.world.SEA_X - 10;
+    }
+    // Health pulih perlahan bila tidak sedang diburu.
+    if (S.wanted === 0 && p.hp > 0 && p.hp < 100) p.hp = Math.min(100, p.hp + 1.5 * dt);
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/police.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — polisi dan wanted.
+// PMCV (Polisi Metropolitan Costa Verde) merespons kejahatan dengan level
+// wanted bintang 1-5. Makin tinggi bintangnya, makin banyak unit yang
+// mengejar; di wanted tinggi, helikopter ikut mengawasi dari langit.
+// Bersembunyi cukup lama membuat wanted turun kembali.
+// Misi 1 adalah mode belajar yang dilunakkan: heat yang masuk dikali
+// 0,42, unit polisi maksimal 2, dan jeda spawn 3,6 detik.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.police = {
+  spawnT: 0,
+  hideT: 0,
+
+  // Batas unit berdasarkan wanted, dengan pelunakan khusus misi 1.
+  maxUnits: function () {
+    var S = CVH.S;
+    var cap = [0, 2, 3, 4, 6, 8][S.wanted] || 0;
+    if (S.mission === 0) cap = Math.min(cap, 2);
+    return cap;
+  },
+
+  spawnInterval: function () {
+    return CVH.S.mission === 0 ? 3.6 : 2.2;
+  },
+
+  // Tambah heat (0-125). Wanted = heat / 25, dibulatkan ke bawah.
+  addHeat: function (n, why) {
+    var S = CVH.S;
+    if (S.mode !== 'play') return;
+    if (S.mission === 0) n *= 0.42; // misi 1 dilunakkan
+    S.heat = Math.min(125, S.heat + n);
+    var w = Math.min(5, Math.floor(S.heat / 25));
+    if (w > S.wanted) {
+      S.wanted = w;
+      CVH.hud.toast('WANTED naik ke ' + w + ' bintang — ' + (why || 'kejahatan terlihat'));
+      CVH.audio.siren(true);
+    }
+  },
+
+  // Turunkan wanted satu tingkat (dipakai saat berhasil bersembunyi).
+  coolDown: function () {
+    var S = CVH.S;
+    if (S.wanted > 0) {
+      S.wanted--;
+      S.heat = S.wanted * 25;
+      CVH.hud.toast('Wanted turun — kamu lolos untuk sementara.');
+      if (S.wanted === 0) CVH.audio.siren(false);
+    }
+  },
+
+  // Munculkan satu unit patroli di jalan dekat pemain.
+  spawnUnit: function () {
+    var S = CVH.S;
+    var rng = CVH.rng;
+    var angle = rng.f(0, Math.PI * 2);
+    var dist = rng.f(320, 480);
+    var x = S.player.x + Math.cos(angle) * dist;
+    var y = S.player.y + Math.sin(angle) * dist;
+    var near = CVH.world.nearestRoad(x, y);
+    if (near.road.v) x = near.road.x + (rng.chance(0.5) ? 21 : -21);
+    else y = near.road.y + (rng.chance(0.5) ? 21 : -21);
+    if (CVH.world.isBlocked(x, y, 30)) return;
+    var car = CVH.vehicles.make('police', x, y, Math.atan2(S.player.y - y, S.player.x - x), 'police');
+    car.siren = true;
+    // Kadang unit berjalan kaki turun dari mobil di wanted rendah.
+    if (S.wanted <= 2 && rng.chance(0.4)) {
+      CVH.peds.make(x + 20, y + 20, { police: true });
+    }
+    return car;
+  },
+
+  // Apakah ada unit polisi yang melihat pemain sekarang?
+  anySeesPlayer: function () {
+    var S = CVH.S;
+    var cars = CVH.vehicles.list;
+    for (var i = 0; i < cars.length; i++) {
+      var c = cars[i];
+      if (c.owner !== 'police' || c.dead) continue;
+      var dx = S.player.x - c.x;
+      var dy = S.player.y - c.y;
+      if (dx * dx + dy * dy < 260 * 260) return true;
+    }
+    var peds = CVH.peds.list;
+    for (var j = 0; j < peds.length; j++) {
+      var p = peds[j];
+      if (!p.police || p.state === 'dead') continue;
+      var qx = S.player.x - p.x;
+      var qy = S.player.y - p.y;
+      if (qx * qx + qy * qy < 200 * 200) return true;
+    }
+    return false;
+  },
+
+  update: function (dt) {
+    var S = CVH.S;
+    if (S.mode !== 'play' || S.paused) return;
+    var cars = CVH.vehicles.list;
+    var units = 0;
+    for (var i = 0; i < cars.length; i++) {
+      if (cars[i].owner === 'police' && !cars[i].dead) units++;
+    }
+
+    // Wanted naik sendiri bila pemain menabrak atau menembak — itu
+    // ditangani modul lain lewat addHeat. Di sini: spawn dan kejar.
+    if (S.wanted > 0) {
+      this.spawnT -= dt;
+      if (units < this.maxUnits() && this.spawnT <= 0) {
+        this.spawnUnit();
+        this.spawnT = this.spawnInterval();
+      }
+      // Bersembunyi: tidak ada unit yang melihat → wanted mendingin.
+      if (!this.anySeesPlayer()) {
+        this.hideT += dt;
+        if (this.hideT > 7) {
+          this.hideT = 0;
+          this.coolDown();
+        }
+      } else {
+        this.hideT = 0;
+      }
+    } else {
+      // Tanpa wanted, unit yang tersisa pergi pelan-pelan.
+      this.hideT = 0;
+    }
+
+    // Kejar: tiap mobil patroli mengarah ke pemain dan mencoba menabrak
+    // atau memotong jalannya.
+    for (var j = 0; j < cars.length; j++) {
+      var car = cars[j];
+      if (car.owner !== 'police' || car.dead) continue;
+      var dx = S.player.x - car.x;
+      var dy = S.player.y - car.y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var want = Math.atan2(dy, dx);
+      var diff = want - car.a;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      var steer = Math.max(-1, Math.min(1, diff * 2.5));
+      // Menjauh dari wanted 0: unit kembali ke markas (mundur pelan).
+      var gas = S.wanted > 0 ? 1 : 0.2;
+      if (d < 60 && S.wanted > 0) gas = 0.4; // dekat: jangan lewat begitu saja
+      var crashed = CVH.vehicles.step(car, { gas: gas, steer: steer }, dt);
+      if (crashed && d < 80) {
+        // Tabrakan polisi ke mobil pemain: guncang dan rusak sedikit.
+        if (S.player.car) CVH.player.hurt(4);
+      }
+      // Mobil pemain ditabrak dari samping sampai berhenti: tangkap.
+      if (S.player.car && d < 40 && Math.abs(S.player.car.speed) < 12 && S.wanted >= 3) {
+        S.arrestT = (S.arrestT || 0) + dt;
+        if (S.arrestT > 2.5) CVH.menus.end(false, 'Mobilmu dikepung PMCV di ' + CVH.world.district(car.x, car.y) + '.');
+      }
+      // Unit yang tertinggal terlalu jauh di belakang, hapus saja.
+      if (d > 900 && S.wanted === 0) car.dead = true;
+    }
+    CVH.vehicles.sweep();
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/helicopter.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — helikopter.
+// Di wanted 3 ke atas, helikopter PMCV "Faro-1" mengudara dan mengitari
+// pemain dari ketinggian, menyorotkan lampu pencari ke jalanan di bawah.
+// Selama sorotan itu menyentuh pemain, bersembunyi tidak akan
+// menurunkan wanted.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.heli = {
+  x: 0,
+  y: 0,
+  z: 240,
+  angle: 0,
+  active: false,
+  rotor: 0,
+
+  update: function (dt) {
+    var S = CVH.S;
+    var want = S.mode === 'play' && S.wanted >= 3;
+    // Adegan foto cover boleh memaksa helikopter menyala.
+    if (S.forceHeli) want = true;
+    if (!want) {
+      this.active = false;
+      return;
+    }
+    this.active = true;
+    this.rotor += dt * 22;
+    // Mengorbit pemain perlahan, makin dekat bila wanted makin tinggi.
+    var radius = 200 - S.wanted * 12;
+    this.angle += dt * 0.45;
+    this.x = S.player.x + Math.cos(this.angle) * radius;
+    this.y = S.player.y + Math.sin(this.angle) * radius;
+    this.z = 230 + Math.sin(S.t * 0.8) * 12;
+  },
+
+  // Apakah sorotan helikopter sedang menyentuh pemain?
+  spotlightOnPlayer: function () {
+    if (!this.active) return false;
+    var S = CVH.S;
+    var dx = S.player.x - this.x;
+    var dy = S.player.y - this.y;
+    return dx * dx + dy * dy < 120 * 120;
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/combat.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — combat.
+// Pukulan jarak dekat dan tiga senjata api: pistol P9, SMG Kobra, dan
+// senapan 12G. Tembakan memakai bidikan mouse (atau arah gerak di layar
+// sentuh), meninggalkan garis peluru sesaat, dan membuat warga di sekitar
+// kabur. Menembak polisi menaikkan wanted dengan cepat.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.combat = {
+  defs: [
+    { name: 'FISTS', label: 'Tangan Kosong', dmg: 14, rate: 0.38, range: 30, auto: false, spread: 0 },
+    { name: 'P9', label: 'Pistol P9', dmg: 20, rate: 0.28, range: 420, auto: false, spread: 0.03 },
+    { name: 'KOBRA', label: 'SMG Kobra', dmg: 12, rate: 0.09, range: 380, auto: true, spread: 0.07 },
+    { name: '12G', label: 'Senapan 12G', dmg: 34, rate: 0.75, range: 300, auto: false, spread: 0.16 },
+  ],
+  tracers: [],
+  flashes: [],
+  cooldown: 0,
+  punchT: 0,
+
+  // Senjata yang sedang dipegang pemain.
+  current: function () {
+    return this.defs[CVH.S.player.weapon] || this.defs[0];
+  },
+
+  // Arah bidikan: mouse di desktop, arah gerak di layar sentuh.
+  aimAngle: function () {
+    var S = CVH.S;
+    var input = CVH.input;
+    if (input.mouse.active) {
+      var dx = input.mouse.x - window.innerWidth / 2;
+      var dy = input.mouse.y - window.innerHeight / 2;
+      // Bidik relatif terhadap kamera: layar tengah adalah pemain.
+      return S.cam.yaw + Math.atan2(dy, dx) - Math.PI / 2 + Math.PI / 2 - 0;
+    }
+    return S.player.a;
+  },
+
+  // Tembak sekali ke arah bidikan. Mengembalikan true bila ada yang kena.
+  fire: function () {
+    var S = CVH.S;
+    if (S.mode !== 'play' || S.paused || S.player.car) return false;
+    if (this.cooldown > 0) return false;
+    var def = this.current();
+    var slot = S.player.weapon;
+    if (slot > 0) {
+      if (S.player.ammo[slot] <= 0) {
+        CVH.hud.toast(def.label + ' kehabisan peluru!');
+        this.cooldown = 0.3;
+        return false;
+      }
+      S.player.ammo[slot]--;
+    }
+    this.cooldown = def.rate;
+    var angle = this.aimAngle() + CVH.rng.f(-def.spread, def.spread);
+    var ox = S.player.x;
+    var oy = S.player.y;
+    var ex = ox + Math.cos(angle) * def.range;
+    var ey = oy + Math.sin(angle) * def.range;
+    var hit = null;
+    var bestD = def.range;
+    // Cari korban terdekat di sepanjang garis tembak.
+    var peds = CVH.peds.list;
+    for (var i = 0; i < peds.length; i++) {
+      var p = peds[i];
+      if (p.state === 'dead') continue;
+      var d = this.distToShot(ox, oy, angle, p.x, p.y);
+      if (d !== null && d < bestD) {
+        bestD = d;
+        hit = p;
+      }
+    }
+    if (hit) {
+      ex = hit.x;
+      ey = hit.y;
+      hit.hp -= def.dmg;
+      if (hit.hp <= 0) {
+        hit.state = 'dead';
+        hit.hp = 0;
+        S.player.kills++;
+        if (hit.police) CVH.police.addHeat(25, 'menembak polisi');
+        else if (hit.gang) CVH.police.addHeat(6, 'baku tembak');
+        else CVH.police.addHeat(14, 'menembak warga');
+      }
+      CVH.peds.scare(hit.x, hit.y, 200);
+    }
+    // Tembakan juga bisa mengenai mobil polisi yang mengejar.
+    var cars = CVH.vehicles.list;
+    for (var j = 0; j < cars.length; j++) {
+      var c = cars[j];
+      if (c.owner !== 'police' || c.dead) continue;
+      var cd = this.distToShot(ox, oy, angle, c.x, c.y);
+      if (cd !== null && cd < bestD) {
+        bestD = cd;
+        ex = c.x;
+        ey = c.y;
+        c.hp -= def.dmg;
+        if (c.hp <= 0) {
+          c.dead = true;
+          CVH.police.addHeat(20, 'menghancurkan mobil patroli');
+        }
+        hit = c;
+      }
+    }
+    this.tracers.push({ x1: ox, y1: oy, x2: ex, y2: ey, t: 0.12 });
+    this.flashes.push({ x: ox + Math.cos(angle) * 26, y: oy + Math.sin(angle) * 26, t: 0.08 });
+    CVH.audio.shoot();
+    CVH.peds.scare(ox, oy, 180);
+    return !!hit;
+  },
+
+  // Jarak sepanjang garis tembak ke sebuah titik, atau null bila titik
+  // itu tidak berada di jalur peluru.
+  distToShot: function (ox, oy, angle, px, py) {
+    var dx = px - ox;
+    var dy = py - oy;
+    var along = dx * Math.cos(angle) + dy * Math.sin(angle);
+    if (along < 0) return null;
+    var side = Math.abs(-dx * Math.sin(angle) + dy * Math.cos(angle));
+    if (side > 22) return null;
+    return along;
+  },
+
+  // Pukulan: mengenai siapa pun yang berdiri sangat dekat di depan.
+  punch: function () {
+    var S = CVH.S;
+    if (S.mode !== 'play' || S.paused || this.cooldown > 0) return;
+    this.cooldown = this.defs[0].rate;
+    this.punchT = 0.18;
+    var ox = S.player.x;
+    var oy = S.player.y;
+    var a = S.player.a;
+    var hit = CVH.peds.nearest(ox + Math.cos(a) * 24, oy + Math.sin(a) * 24, 26, function (p) {
+      return p.state !== 'dead';
+    });
+    if (hit) {
+      hit.hp -= this.defs[0].dmg;
+      hit.state = 'flee';
+      hit.panic = 2;
+      hit.tx = hit.x + Math.cos(a) * 160;
+      hit.ty = hit.y + Math.sin(a) * 160;
+      if (hit.hp <= 0) {
+        hit.state = 'dead';
+        S.player.kills++;
+        if (hit.police) CVH.police.addHeat(20, 'memukul polisi');
+      }
+      CVH.audio.punch();
+    }
+  },
+
+  // Tembakan musuh (geng dan polisi jalan kaki) ke arah pemain.
+  enemyShot: function (from, targetX, targetY) {
+    var angle = Math.atan2(targetY - from.y, targetX - from.x) + CVH.rng.f(-0.1, 0.1);
+    var range = 380;
+    var ex = from.x + Math.cos(angle) * range;
+    var ey = from.y + Math.sin(angle) * range;
+    this.tracers.push({ x1: from.x, y1: from.y, x2: ex, y2: ey, t: 0.1, enemy: true });
+    // Peluru musuh mengenai pemain bila arahnya cukup lurus.
+    var S = CVH.S;
+    var dx = S.player.x - from.x;
+    var dy = S.player.y - from.y;
+    var along = dx * Math.cos(angle) + dy * Math.sin(angle);
+    var side = Math.abs(-dx * Math.sin(angle) + dy * Math.cos(angle));
+    if (along > 0 && along < range && side < 20 && !S.player.car) {
+      CVH.player.hurt(CVH.rng.i(5, 11));
+    } else if (along > 0 && along < range && side < 24 && S.player.car) {
+      S.player.car.hp -= 4;
+    }
+  },
+
+  update: function (dt) {
+    if (this.cooldown > 0) this.cooldown -= dt;
+    if (this.punchT > 0) this.punchT -= dt;
+    for (var i = this.tracers.length - 1; i >= 0; i--) {
+      this.tracers[i].t -= dt;
+      if (this.tracers[i].t <= 0) this.tracers.splice(i, 1);
+    }
+    for (var j = this.flashes.length - 1; j >= 0; j--) {
+      this.flashes[j].t -= dt;
+      if (this.flashes[j].t <= 0) this.flashes.splice(j, 1);
+    }
+    // Geng yang masih hidup menembak pemain atau geng lawan.
+    var S = CVH.S;
+    if (S.mode !== 'play' || S.paused) return;
+    var peds = CVH.peds.list;
+    for (var k = 0; k < peds.length; k++) {
+      var p = peds[k];
+      if (p.state === 'dead' || !p.gang) continue;
+      p.shootT = (p.shootT || CVH.rng.f(0.5, 2)) - dt;
+      if (p.shootT > 0) continue;
+      p.shootT = CVH.rng.f(1.2, 2.6);
+      // Cari sasaran: pemain bila dekat, atau geng lawan bila perang.
+      var target = null;
+      var pdx = S.player.x - p.x;
+      var pdy = S.player.y - p.y;
+      if (pdx * pdx + pdy * pdy < 420 * 420) target = { x: S.player.x, y: S.player.y };
+      else if (S.gangWar) {
+        var foe = CVH.peds.nearest(p.x, p.y, 380, function (q) {
+          return q.gang && q.gang !== p.gang && q.state !== 'dead';
+        });
+        if (foe) target = foe;
+      }
+      if (target) this.enemyShot(p, target.x, target.y);
+    }
+    // Rayo membantu menembak musuh terdekat setiap dua detik.
+    if (S.rayo) {
+      S.rayoT = (S.rayoT || 0) - dt;
+      if (S.rayoT <= 0) {
+        S.rayoT = 2;
+        var foe2 = CVH.peds.nearest(S.rayo.x, S.rayo.y, 360, function (q) {
+          return q.gang === 'caiman' && q.state !== 'dead';
+        });
+        if (foe2) {
+          foe2.hp -= 30;
+          this.tracers.push({ x1: S.rayo.x, y1: S.rayo.y, x2: foe2.x, y2: foe2.y, t: 0.1 });
+          if (foe2.hp <= 0) {
+            foe2.state = 'dead';
+            S.player.kills++;
+          }
+        }
+      }
+    }
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/missions.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — misi.
+// Dua belas misi berurutan dengan cerita kriminal orisinal: Nico, pemuda
+// Costa Verde, ditarik masuk dunia geng Caimán dan Víperas, perang geng
+// melawan polisi PMCV, dan ditemani Bruno "Rayo" Cárdenas. Tiap misi
+// punya beberapa tahap — sampai ke titik, balapan checkpoint, mengalahkan
+// sejumlah musuh, bertahan, atau mengejar mobil — dengan objektif di HUD
+// dan penanda di minimap.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.missions = {
+  defs: [
+    {
+      title: 'Pesan Pertama', reward: 500,
+      brief: 'Bawa Coral GT merah ke dermaga marina. Tenang saja — ini pemanasan.',
+      dialog: [
+        { who: 'MARINA SOLÍS · FIXER', text: 'Nico, mobil merah itu milikmu malam ini. Antar ke dermaga, jangan bikin ribut.' },
+        { who: 'NICO', text: 'Cuma antar mobil? Gampang. Gas, deh.' },
+      ],
+      stages: [
+        { kind: 'reach', x: 1000, y: -300, r: 60, inCar: true, label: 'Antar Coral GT ke dermaga marina' },
+      ],
+    },
+    {
+      title: 'Kurir Senja', reward: 700,
+      brief: 'Ambil dua paket di toko, antar ke Café Brisa sebelum malam turun.',
+      dialog: [
+        { who: 'MARINA SOLÍS · FIXER', text: 'Dua paket, dua toko. Jangan dibuka, jangan ditanya isinya.' },
+      ],
+      stages: [
+        { kind: 'collect', points: [{ x: -300, y: -600 }, { x: 300, y: 600 }], label: 'Ambil paket (2) — dekati lalu tekan ACT' },
+        { kind: 'reach', x: 750, y: 300, r: 55, label: 'Antar paket ke Café Brisa' },
+      ],
+    },
+    {
+      title: 'Rayo Ikut', reward: 800,
+      brief: 'Temui Bruno "Rayo" Cárdenas di plaza, lalu bawa dia ke tempat aman.',
+      dialog: [
+        { who: 'BRUNO "RAYO" CÁRDENAS', text: 'Nico! Kau yang disuruh Marina, ya? Aku ikut. Aku yang pegang peta.' },
+        { who: 'NICO', text: 'Naik. Kita ke rumah aman di Barrio Verde.' },
+      ],
+      stages: [
+        { kind: 'reach', x: 0, y: 0, r: 70, label: 'Temui Rayo di Plaza Api Emas' },
+        { kind: 'escort', x: -750, y: 450, r: 60, label: 'Bawa Rayo ke rumah aman (dia harus ikut)' },
+      ],
+    },
+    {
+      title: 'Balapan Bulevar', reward: 1200,
+      brief: 'Balapan checkpoint di Boulevard Serena. Empat gerbang, 75 detik.',
+      dialog: [
+        { who: 'RAYO', text: 'Para pembalap jalanan menantangmu, Nico. Menang, dan namamu dikenal.' },
+      ],
+      stages: [
+        { kind: 'race', time: 75, points: [{ x: 900, y: -600 }, { x: 900, y: 0 }, { x: 900, y: 600 }, { x: 600, y: 900 }], label: 'Lewati semua checkpoint balapan' },
+      ],
+    },
+    {
+      title: 'Utang Lama', reward: 900,
+      brief: 'Tiga orang berutang pada Marina. Datangi mereka, tagih dengan sopan.',
+      dialog: [
+        { who: 'MARINA SOLÍS · FIXER', text: 'Tiga nama, tiga alamat. Mereka tahu harus bayar berapa.' },
+      ],
+      stages: [
+        { kind: 'collect', points: [{ x: -600, y: -300 }, { x: 0, y: -900 }, { x: 600, y: 300 }], label: 'Tagih utang (3) — dekati lalu tekan ACT' },
+      ],
+    },
+    {
+      title: 'Gudang Caimán', reward: 1500,
+      brief: 'Geng Caimán menahan kiriman Marina di gudang barat. Bersihkan mereka.',
+      dialog: [
+        { who: 'RAYO', text: 'Empat orang jaga gudang itu. Mereka bersenjata — kau juga harus begitu.' },
+      ],
+      stages: [
+        { kind: 'kill', gang: 'caiman', count: 4, label: 'Kalahkan penjaga gudang Caimán (0/4)' },
+      ],
+    },
+    {
+      title: 'Perang Bulevar', reward: 2000,
+      brief: 'Caimán dan Víperas perang terbuka di bulevar. Bertahan dan habisi enam orang.',
+      dialog: [
+        { who: 'CITY EVENT', text: 'PERANG GENG — CAIMÁN VS VÍPERAS, BOULEVARD SERENA' },
+        { who: 'RAYO', text: 'Dua geng saling tembak di jalan! Kita di tengah-tengahnya, Nico!' },
+      ],
+      stages: [
+        { kind: 'kill', gang: 'any', count: 6, label: 'Kalahkan anggota geng di bulevar (0/6)' },
+      ],
+    },
+    {
+      title: 'Sirene di Puerto', reward: 1500,
+      brief: 'PMCV mengejarmu di Puerto Azul. Bertahan 60 detik, lalu menghilang.',
+      dialog: [
+        { who: 'PMCV DISPATCH', text: 'Semua unit: tersangka di Puerto Azul. Kejar dan tangkap!' },
+      ],
+      stages: [
+        { kind: 'survive', t: 60, minWanted: 2, label: 'Bertahan dari kejaran PMCV (60 dtk)' },
+        { kind: 'hide', label: 'Menghilang — turunkan wanted sampai 0' },
+      ],
+    },
+    {
+      title: 'Jembatan Panas', reward: 1800,
+      brief: 'Antar mobil melintasi kota ke ujung selatan dalam 90 detik, dengan mobil.',
+      dialog: [
+        { who: 'MARINA SOLÍS · FIXER', text: 'Mobil itu harus sampai selatan sebelum jam delapan. Jangan berhenti.' },
+      ],
+      stages: [
+        { kind: 'reach', x: 900, y: 900, r: 60, inCar: true, time: 90, label: 'Sampai ke ujung selatan dalam 90 detik' },
+      ],
+    },
+    {
+      title: 'Tembak-menembak Puerto Azul', reward: 2200,
+      brief: 'Bantu polisi mengakhiri baku tembak: kalahkan enam penembak Caimán.',
+      dialog: [
+        { who: 'PAZ IBARRA · LOOKOUT', text: 'Polisi terjepit di balik mobil mereka, Nico — habisi sisi Caimán!' },
+        { who: 'CITY EVENT', text: 'TEMBAK-MENEMBAK — PMCV VS CAIMÁN, PUERTO AZUL' },
+      ],
+      stages: [
+        { kind: 'kill', gang: 'caiman', count: 6, label: 'Kalahkan penembak Caimán (0/6)' },
+      ],
+    },
+    {
+      title: 'Kejar-kejaran', reward: 2000,
+      brief: 'Mobil kriminal kabur ke utara. Kejar dan hentikan dia dengan tabrakan.',
+      dialog: [
+        { who: 'RAYO', text: 'Itu dia! Sedan abu-abu itu! Tabrak sampai dia berhenti, Nico!' },
+      ],
+      stages: [
+        { kind: 'chase', label: 'Kejar sedan kriminal — tabrak sampai berhenti' },
+      ],
+    },
+    {
+      title: 'Api Emas', reward: 5000,
+      brief: 'Finale: kalahkan El Toro di Plaza Api Emas, lalu berdiri di bawah monumen.',
+      dialog: [
+        { who: 'EL TORO · CAIMÁN', text: 'Kota ini milik Caimán, anak kecil. Kau tidak akan pulang malam ini.' },
+        { who: 'RAYO', text: 'Ini akhirnya, Nico. Habisi dia, lalu kota ini milik kita.' },
+      ],
+      stages: [
+        { kind: 'boss', label: 'Kalahkan El Toro di plaza' },
+        { kind: 'reach', x: 0, y: 0, r: 55, label: 'Berdiri di bawah Tugu Api Emas' },
+      ],
+    },
+  ],
+
+  // Misi yang sedang berjalan.
+  cur: function () {
+    return this.defs[CVH.S.mission];
+  },
+
+  // Judul misi untuk HUD: "MISSION 5/12 — HARBOR LIGHTS".
+  titleLine: function () {
+    var S = CVH.S;
+    var m = this.cur();
+    if (!m) return '';
+    return 'MISSION ' + (S.mission + 1) + '/12 — ' + m.title.toUpperCase();
+  },
+
+  // Tahap aktif sekarang.
+  stage: function () {
+    var m = this.cur();
+    if (!m) return null;
+    return m.stages[CVH.S.mstage];
+  },
+
+  // Teks objektif tahap aktif, dengan hitungan bila ada.
+  objectiveText: function () {
+    var st = this.stage();
+    if (!st) return '';
+    var S = CVH.S;
+    var label = st.label || '';
+    if (st.kind === 'kill') {
+      var done = S.player.kills - (S.mdata.kills0 || 0);
+      label = label.replace(/\(\d+\/\d+\)/, '(' + Math.min(done, st.count) + '/' + st.count + ')');
+    }
+    if (st.kind === 'race') {
+      label += ' — ' + Math.max(0, Math.ceil(S.mdata.raceT || 0)) + ' dtk';
+    }
+    if (st.kind === 'survive') {
+      label += ' — ' + Math.max(0, Math.ceil(S.mdata.surviveT || 0)) + ' dtk';
+    }
+    if (st.kind === 'collect') {
+      label += ' (' + (S.mdata.got || 0) + '/' + st.points.length + ')';
+    }
+    return label;
+  },
+
+  // Munculkan sekelompok anggota geng di sekitar titik.
+  spawnGang: function (gang, x, y, n, hp) {
+    var rng = CVH.rng;
+    var made = [];
+    for (var i = 0; i < n; i++) {
+      var px = x + rng.f(-70, 70);
+      var py = y + rng.f(-70, 70);
+      if (CVH.world.isBlocked(px, py, 12)) continue;
+      var p = CVH.peds.make(px, py, { gang: gang });
+      p.hp = hp || 100;
+      made.push(p);
+    }
+    return made;
+  },
+
+  // Pastikan Rayo ada di dunia dan mengikuti pemain.
+  ensureRayo: function () {
+    var S = CVH.S;
+    if (S.rayo && S.rayo.state !== 'dead') return S.rayo;
+    var r = CVH.peds.make(S.player.x + 40, S.player.y + 40, { rayo: true });
+    S.rayo = r;
+    return r;
+  },
+
+  // Siapkan tahap: penanda, musuh, timer, dan strip event kota.
+  setupStage: function () {
+    var S = CVH.S;
+    var st = this.stage();
+    if (!st) return;
+    S.mdata = S.mdata || {};
+    S.marker = null;
+    if (st.kind === 'reach' || st.kind === 'escort') {
+      S.marker = { x: st.x, y: st.y, label: st.label };
+    }
+    if (st.kind === 'race') {
+      S.mdata.raceIdx = 0;
+      S.mdata.raceT = st.time;
+      S.marker = { x: st.points[0].x, y: st.points[0].y, label: 'CHECKPOINT 1/' + st.points.length };
+    }
+    if (st.kind === 'kill') {
+      S.mdata.kills0 = S.player.kills;
+      if (st.gang === 'caiman' || st.gang === 'any') this.spawnGang('caiman', S.player.x + 200, S.player.y, 4);
+      if (st.gang === 'any') this.spawnGang('viperas', S.player.x - 200, S.player.y, 4);
+      if (S.mission === 9) {
+        this.spawnGang('caiman', 300, 750, 6, 90);
+        for (var i = 0; i < 3; i++) CVH.peds.make(260 + i * 30, 700, { police: true });
+        CVH.hud.setEvent('TEMBAK-MENEMBAK — PMCV VS CAIMÁN, PUERTO AZUL', 20);
+      }
+      if (S.mission === 6) {
+        CVH.hud.setEvent('PERANG GENG — CAIMÁN VS VÍPERAS, BOULEVARD SERENA', 25);
+        S.gangWar = true;
+      }
+    }
+    if (st.kind === 'survive') {
+      S.mdata.surviveT = st.t;
+      CVH.police.addHeat(55, 'kejaran PMCV');
+    }
+    if (st.kind === 'collect') {
+      S.mdata.got = 0;
+      S.mdata.gotIdx = {};
+      S.marker = { x: st.points[0].x, y: st.points[0].y, label: 'Titik berikut' };
+    }
+    if (st.kind === 'chase') {
+      var car = CVH.vehicles.make('sedan', S.player.x + 150, S.player.y - 100, -Math.PI / 2, 'mission');
+      car.color = '#8a8a8a';
+      S.chaseCar = car;
+      S.marker = null;
+    }
+    if (st.kind === 'boss') {
+      var boss = CVH.peds.make(60, -60, { gang: 'caiman', name: 'El Toro' });
+      boss.hp = 240;
+      boss.shirt = '#1a1a1a';
+      S.boss = boss;
+      this.spawnGang('caiman', 0, 0, 3, 90);
+      S.marker = { x: 60, y: -60, label: 'EL TORO' };
+    }
+  },
+
+  // Mulai misi ke-i dari awal.
+  start: function (i) {
+    var S = CVH.S;
+    S.mission = i;
+    S.mstage = 0;
+    S.mdata = {};
+    S.gangWar = false;
+    S.event = '';
+    var m = this.defs[i];
+    if (!m) {
+      CVH.menus.end(true, 'Semua 12 misi selesai — Costa Verde milikmu, Nico!');
+      return;
+    }
+    if (i >= 2) this.ensureRayo();
+    // Coral GT merah disiapkan di dekat pemain untuk misi pertama.
+    if (i === 0 && !S.coralGiven) {
+      S.coralGiven = true;
+      var coral = CVH.vehicles.make('coral', S.player.x + 60, S.player.y + 30, -Math.PI / 2, 'parked');
+      coral.color = '#d8322a';
+    }
+    CVH.hud.toast('MISI ' + (i + 1) + '/12 — ' + m.title);
+    CVH.hud.queueDialog(m.dialog || []);
+    this.setupStage();
+    CVH.save.save();
+  },
+
+  // Tahap selesai: lanjut ke tahap berikut, atau misi selesai.
+  stageDone: function () {
+    var S = CVH.S;
+    var m = this.cur();
+    S.mstage++;
+    if (S.mstage >= m.stages.length) {
+      CVH.player.addCash(m.reward);
+      CVH.hud.toast('MISI SELESAI — ' + m.title + ' (+$' + m.reward + ')');
+      CVH.audio.missionDone();
+      var next = S.mission + 1;
+      if (next >= this.defs.length) {
+        CVH.menus.end(true, 'Semua 12 misi selesai — Costa Verde milikmu, Nico!');
+        return;
+      }
+      this.start(next);
+    } else {
+      CVH.hud.toast('Tahap selesai — lanjut!');
+      this.setupStage();
+    }
+  },
+
+  // Jarak pemain ke sebuah titik.
+  distTo: function (x, y) {
+    var S = CVH.S;
+    var dx = S.player.x - x;
+    var dy = S.player.y - y;
+    return Math.sqrt(dx * dx + dy * dy);
+  },
+
+  update: function (dt) {
+    var S = CVH.S;
+    if (S.mode !== 'play' || S.paused) return;
+    var st = this.stage();
+    if (!st) return;
+    var m = this.cur();
+
+    if (st.kind === 'reach' || st.kind === 'escort') {
+      if (st.time !== undefined) {
+        S.mdata.timeLeft = (S.mdata.timeLeft === undefined ? st.time : S.mdata.timeLeft) - dt;
+        if (S.mdata.timeLeft <= 0) {
+          CVH.menus.end(false, 'Waktu habis — ' + m.title + ' gagal.');
+          return;
+        }
+      }
+      var ok = this.distTo(st.x, st.y) < st.r;
+      if (st.inCar) ok = ok && !!S.player.car;
+      if (st.kind === 'escort') ok = ok && S.rayo && S.rayo.state !== 'dead';
+      if (ok) this.stageDone();
+    } else if (st.kind === 'race') {
+      S.mdata.raceT -= dt;
+      if (S.mdata.raceT <= 0) {
+        CVH.menus.end(false, 'Waktu balapan habis — coba lagi, Nico.');
+        return;
+      }
+      var pt = st.points[S.mdata.raceIdx];
+      if (pt && this.distTo(pt.x, pt.y) < 55) {
+        S.mdata.raceIdx++;
+        CVH.audio.checkpoint();
+        if (S.mdata.raceIdx >= st.points.length) {
+          this.stageDone();
+        } else {
+          var np = st.points[S.mdata.raceIdx];
+          S.marker = { x: np.x, y: np.y, label: 'CHECKPOINT ' + (S.mdata.raceIdx + 1) + '/' + st.points.length };
+          CVH.hud.toast('Checkpoint ' + S.mdata.raceIdx + '/' + st.points.length + '!');
+        }
+      }
+    } else if (st.kind === 'kill') {
+      var done = S.player.kills - (S.mdata.kills0 || 0);
+      if (done >= st.count) {
+        S.gangWar = false;
+        this.stageDone();
+      } else if (st.gang === 'any' && done < st.count) {
+        // Perang geng: tambah anggota baru bila arena mulai sepi.
+        var alive = 0;
+        var list = CVH.peds.list;
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].gang && list[i].state !== 'dead') alive++;
+        }
+        if (alive < 3) {
+          this.spawnGang(CVH.rng.chance(0.5) ? 'caiman' : 'viperas', S.player.x + CVH.rng.f(-250, 250), S.player.y + CVH.rng.f(-150, 150), 2);
+        }
+      }
+    } else if (st.kind === 'survive') {
+      S.mdata.surviveT -= dt;
+      if (S.mdata.surviveT <= 0) this.stageDone();
+    } else if (st.kind === 'hide') {
+      if (S.wanted === 0) this.stageDone();
+    } else if (st.kind === 'collect') {
+      var next2 = st.points[S.mdata.got || 0];
+      if (next2) {
+        S.marker = { x: next2.x, y: next2.y, label: 'Titik berikut' };
+        if (this.distTo(next2.x, next2.y) < 45 && (CVH.input.pressed('KeyE') || CVH.input.actPressed)) {
+          S.mdata.got++;
+          CVH.audio.checkpoint();
+          CVH.hud.toast('Dapat (' + S.mdata.got + '/' + st.points.length + ')');
+          if (S.mdata.got >= st.points.length) this.stageDone();
+        }
+      }
+    } else if (st.kind === 'chase') {
+      var car = S.chaseCar;
+      if (!car) return;
+      // Mobil kriminal kabur menyusuri jalan ke utara.
+      var want = Math.atan2(-1000 - car.y, car.x - car.x + 0.001);
+      var diff = want - car.a;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      var steer = Math.max(-1, Math.min(1, diff * 2));
+      CVH.vehicles.step(car, { gas: 0.9, steer: steer }, dt);
+      S.marker = { x: car.x, y: car.y, label: 'TARGET' };
+      // Tertabrak pemain sampai hancur: misi selesai.
+      if (car.hp <= 25 || Math.abs(car.speed) < 5 && this.distTo(car.x, car.y) < 50) {
+        if (car.hp <= 25 || this.distTo(car.x, car.y) < 45) {
+          car.dead = true;
+          this.stageDone();
+        }
+      }
+      // Lolos terlalu jauh: gagal.
+      if (Math.abs(car.y) > 1100) {
+        CVH.menus.end(false, 'Target kabur dari kota — kejar-kejaran gagal.');
+      }
+    } else if (st.kind === 'boss') {
+      var boss = S.boss;
+      if (boss && boss.state === 'dead') this.stageDone();
+    }
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/hud.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — HUD.
+// Semua tampilan layar: panel misi, bintang wanted, uang, jam, health dan
+// armor, kecepatan, slot senjata, radio, strip event kota, dialog cerita,
+// dan pesan singkat. HUD ini DOM (bukan canvas) supaya teksnya tajam.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.hud = {
+  dialogQueue: [],
+  dialogT: 0,
+  toastT: 0,
+  eventT: 0,
+  flashT: 0,
+
+  el: function (id) {
+    return document.getElementById(id);
+  },
+
+  init: function () {
+    // Catatan boot yang menghilang sendiri beberapa detik setelah mulai.
+    var note = this.el('boot-note');
+    if (note) {
+      setTimeout(function () {
+        note.style.opacity = '0';
+      }, 5000);
+    }
+  },
+
+  // Pesan singkat di tengah bawah, hilang sendiri.
+  toast: function (txt) {
+    var t = this.el('toast');
+    if (!t) return;
+    t.textContent = txt;
+    t.style.opacity = '1';
+    this.toastT = 3;
+  },
+
+  // Strip event kota di bawah panel misi (perang geng, baku tembak, ...).
+  setEvent: function (txt, dur) {
+    var S = CVH.S;
+    S.event = txt;
+    this.eventT = dur || 12;
+    var e = this.el('event-strip');
+    if (e) {
+      e.textContent = '⚠ CITY EVENT — ' + txt;
+      e.style.display = 'block';
+    }
+  },
+
+  // Antrean dialog cerita: satu baris tampil beberapa detik, lalu lanjut.
+  queueDialog: function (list) {
+    this.dialogQueue = (list || []).slice();
+    this.dialogT = 0;
+  },
+
+  // Kilatan merah saat pemain terluka.
+  flashDamage: function () {
+    this.flashT = 0.35;
+    var f = this.el('damage-flash');
+    if (f) f.style.opacity = '0.45';
+  },
+
+  // Uang dengan pemisah ribuan, gaya Amerika ($12,480).
+  money: function (n) {
+    return '$' + Math.floor(n).toLocaleString('en-US');
+  },
+
+  // Jam kota: 17:41 dari angka 17.68.
+  clockText: function () {
+    var S = CVH.S;
+    var h = Math.floor(S.clock);
+    var m = Math.floor((S.clock - h) * 60);
+    return 'DAY ' + S.day + '  ' + (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  },
+
+  update: function (dt) {
+    var S = CVH.S;
+    if (!S) return;
+    var p = S.player;
+
+    // Panel misi kiri atas.
+    var mt = this.el('mission-title');
+    if (mt) mt.textContent = CVH.missions.titleLine();
+    var ms = this.el('mission-stage');
+    if (ms) {
+      var m = CVH.missions.cur();
+      ms.textContent = m ? 'STAGE ' + (S.mstage + 1) + '/' + m.stages.length : '';
+    }
+    var mn = this.el('mission-next');
+    if (mn) mn.textContent = CVH.missions.objectiveText();
+
+    // Uang, jam, kawasan.
+    var money = this.el('money');
+    if (money) money.textContent = this.money(p.money);
+    var clock = this.el('day-clock');
+    if (clock) clock.textContent = this.clockText();
+    var dist = this.el('district-label');
+    if (dist) dist.textContent = CVH.world.district(p.x, p.y);
+    var street = this.el('street-label');
+    if (street) street.textContent = CVH.world.streetName(p.x, p.y) + ' · ' + (S.wanted > 0 ? 'WANTED' : 'AMAN');
+
+    // Bintang wanted: bintang menyala kuning, sisanya redup.
+    var stars = this.el('stars');
+    if (stars) {
+      var html = '';
+      for (var i = 0; i < 5; i++) {
+        html += '<span class="star' + (i < S.wanted ? ' on' : '') + '">★</span>';
+      }
+      html += ' <span class="sight">' + (S.wanted > 0 ? (CVH.police.anySeesPlayer() ? 'TERLIHAT' : 'SEMBUNYI') : '') + '</span>';
+      stars.innerHTML = html;
+    }
+
+    // Status kanan bawah: kecepatan, kendaraan, health, armor, senjata.
+    var speed = this.el('speed');
+    if (speed) speed.textContent = p.car ? String(Math.round(Math.abs(p.car.speed) * 0.55)) : '0';
+    var carName = this.el('car-name');
+    if (carName) carName.textContent = p.car ? p.car.name.toUpperCase() + ' · KONDISI ' + Math.max(0, Math.round(p.car.hp)) + '%' : 'JALAN KAKI';
+    var hf = this.el('health-fill');
+    if (hf) hf.style.width = Math.max(0, p.hp) + '%';
+    var af = this.el('armor-fill');
+    if (af) af.style.width = Math.max(0, p.armor) + '%';
+    var rank = this.el('rank-line');
+    if (rank) rank.textContent = 'RANK 4 · FIXER   ' + (S.rp || 640) + ' / 900 RP';
+    var slots = this.el('weapon-slots');
+    if (slots) {
+      var defs = CVH.combat.defs;
+      var out = '';
+      for (var w = 0; w < defs.length; w++) {
+        var ammo = w === 0 ? '∞' : String(p.ammo[w]);
+        out += '<div class="wslot' + (p.weapon === w ? ' sel' : '') + '"><b>' + (w + 1) + '</b> ' + defs[w].name + '<br><span>' + ammo + '</span></div>';
+      }
+      out += '<div class="wslot lock"><b>5</b> LOCKED<br><span>RANK 5</span></div>';
+      slots.innerHTML = out;
+      var cur = this.el('weapon-now');
+      if (cur) cur.textContent = defs[p.weapon].label.toUpperCase();
+    }
+
+    // Radio: stasiun dan lagu yang sedang diputar.
+    var radio = this.el('radio-line');
+    if (radio) radio.textContent = '♪ ' + CVH.radio.now();
+
+    // Strip event kota: hitung mundur lalu sembunyikan.
+    if (this.eventT > 0) {
+      this.eventT -= dt;
+      if (this.eventT <= 0) {
+        var e2 = this.el('event-strip');
+        if (e2) e2.style.display = 'none';
+        S.event = '';
+      }
+    }
+
+    // Dialog cerita: tampilkan antrean satu per satu.
+    var dlg = this.el('dialog');
+    if (dlg) {
+      if (this.dialogT > 0) {
+        this.dialogT -= dt;
+        if (this.dialogT <= 0) dlg.style.display = 'none';
+      } else if (this.dialogQueue.length > 0) {
+        var line = this.dialogQueue.shift();
+        var who = this.el('dialog-who');
+        var txt = this.el('dialog-text');
+        if (who) who.textContent = line.who;
+        if (txt) txt.textContent = '"' + line.text + '"';
+        dlg.style.display = 'block';
+        this.dialogT = 4.2;
+      }
+    }
+
+    // Toast menghilang sendiri.
+    if (this.toastT > 0) {
+      this.toastT -= dt;
+      if (this.toastT <= 0) {
+        var t2 = this.el('toast');
+        if (t2) t2.style.opacity = '0';
+      }
+    }
+    // Kilatan damage memudar.
+    if (this.flashT > 0) {
+      this.flashT -= dt;
+      if (this.flashT <= 0) {
+        var f2 = this.el('damage-flash');
+        if (f2) f2.style.opacity = '0';
+      }
+    }
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/minimap.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — minimap.
+// Peta kecil bundar di kiri bawah: jalan, pantai, plaza, pemain (panah
+// putih), polisi (titik merah), warga (titik biru), dan penanda misi
+// (wajik kuning). Digambar ulang tiap frame dari data dunia yang sama.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.minimap = {
+  SIZE: 180,
+
+  draw: function () {
+    var canvas = document.getElementById('minimap');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var S = CVH.S;
+    var W = CVH.world;
+    var size = this.SIZE;
+    var scale = size / (W.BOUND * 2 + 80);
+    var toX = function (x) {
+      return size / 2 + x * scale;
+    };
+    var toY = function (y) {
+      return size / 2 + y * scale;
+    };
+
+    ctx.clearRect(0, 0, size, size);
+    // Latar kota.
+    ctx.fillStyle = '#3d5a3a';
+    ctx.fillRect(0, 0, size, size);
+    // Laut dan pasir di timur.
+    ctx.fillStyle = '#2a6a8a';
+    ctx.fillRect(toX(W.SEA_X), 0, size - toX(W.SEA_X), size);
+    ctx.fillStyle = '#d8c08a';
+    ctx.fillRect(toX(W.BEACH_X), 0, toX(W.SEA_X) - toX(W.BEACH_X), size);
+    // Jalan.
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 84 * scale;
+    var roads = W.roads;
+    for (var i = 0; i < roads.length; i++) {
+      var r = roads[i];
+      ctx.beginPath();
+      if (r.v) {
+        ctx.moveTo(toX(r.x), toY(r.y1));
+        ctx.lineTo(toX(r.x), toY(r.y2));
+      } else {
+        ctx.moveTo(toX(r.x1), toY(r.y));
+        ctx.lineTo(toX(r.x2), toY(r.y));
+      }
+      ctx.stroke();
+    }
+    // Garis tengah jalan.
+    ctx.strokeStyle = '#c8b060';
+    ctx.lineWidth = 1;
+    for (var j = 0; j < roads.length; j++) {
+      var r2 = roads[j];
+      ctx.beginPath();
+      if (r2.v) {
+        ctx.moveTo(toX(r2.x), toY(r2.y1));
+        ctx.lineTo(toX(r2.x), toY(r2.y2));
+      } else {
+        ctx.moveTo(toX(r2.x1), toY(r2.y));
+        ctx.lineTo(toX(r2.x2), toY(r2.y));
+      }
+      ctx.stroke();
+    }
+    // Plaza dan monumen.
+    ctx.fillStyle = '#c8b088';
+    ctx.beginPath();
+    ctx.arc(toX(0), toY(0), 150 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8b820';
+    ctx.beginPath();
+    ctx.arc(toX(0), toY(0), 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Warga: titik biru kecil.
+    ctx.fillStyle = '#6aa8e8';
+    var peds = CVH.peds.list;
+    for (var k = 0; k < peds.length; k++) {
+      var p = peds[k];
+      if (p.state === 'dead') continue;
+      ctx.fillRect(toX(p.x) - 1, toY(p.y) - 1, 2, 2);
+    }
+    // Polisi: titik merah.
+    ctx.fillStyle = '#e83a3a';
+    var cars = CVH.vehicles.list;
+    for (var c = 0; c < cars.length; c++) {
+      var car = cars[c];
+      if (car.owner === 'police' && !car.dead) {
+        ctx.beginPath();
+        ctx.arc(toX(car.x), toY(car.y), 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Penanda misi: wajik kuning berdenyut.
+    if (S.marker) {
+      var pulse = 5 + Math.sin(S.t * 5) * 2;
+      ctx.fillStyle = '#ffe020';
+      ctx.beginPath();
+      ctx.moveTo(toX(S.marker.x), toY(S.marker.y) - pulse);
+      ctx.lineTo(toX(S.marker.x) + pulse, toY(S.marker.y));
+      ctx.lineTo(toX(S.marker.x), toY(S.marker.y) + pulse);
+      ctx.lineTo(toX(S.marker.x) - pulse, toY(S.marker.y));
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Pemain: panah putih mengikuti arah hadap.
+    var px = toX(S.player.x);
+    var py = toY(S.player.y);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(S.player.a);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(7, 0);
+    ctx.lineTo(-5, -5);
+    ctx.lineTo(-5, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/menus.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — menu dan layar.
+// Layar judul menampilkan kamera yang melayang di atas Boulevard Serena
+// yang asli — dunia yang sama dengan yang dimainkan, bukan gambar mati.
+// Ada juga layar mulai, jeda (Esc/P), menang, dan kalah dengan tombol
+// coba lagi untuk misi yang gagal.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.menus = {
+  titleT: 0,
+
+  show: function (id) {
+    var ids = ['title-screen', 'pause-screen', 'end-screen'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el) el.style.display = ids[i] === id ? 'flex' : 'none';
+    }
+  },
+
+  hideAll: function () {
+    this.show(null);
+  },
+
+  // Masuk ke layar judul: kamera berjalan sendiri di bulevar.
+  showTitle: function () {
+    var S = CVH.S;
+    S.mode = 'title';
+    this.titleT = 0;
+    this.show('title-screen');
+    var sub = document.getElementById('title-sub');
+    if (sub) sub.textContent = 'Kota pantai tropis · 12 misi · perang geng · kejar-kejaran polisi';
+  },
+
+  // Mulai permainan dari layar judul.
+  startGame: function () {
+    var S = CVH.S;
+    CVH.audio.ensure();
+    CVH.audio.click();
+    S.mode = 'play';
+    this.hideAll();
+    // Muat progres bila ada, kalau tidak mulai misi pertama.
+    if (!CVH.save.load()) {
+      CVH.missions.start(0);
+    }
+    CVH.hud.toast('Selamat datang di Costa Verde, Nico.');
+  },
+
+  // Jeda atau lanjut.
+  togglePause: function () {
+    var S = CVH.S;
+    if (S.mode !== 'play' && S.mode !== 'pause') return;
+    if (S.mode === 'play') {
+      S.mode = 'pause';
+      S.paused = true;
+      this.show('pause-screen');
+    } else {
+      S.mode = 'play';
+      S.paused = false;
+      this.hideAll();
+    }
+  },
+
+  // Layar akhir: menang (semua misi selesai) atau kalah (tangkap/tumbang).
+  end: function (win, msg) {
+    var S = CVH.S;
+    if (S.mode === 'end') return;
+    S.mode = 'end';
+    S.gameOver = { win: win, msg: msg };
+    CVH.save.save();
+    var title = document.getElementById('end-title');
+    var text = document.getElementById('end-text');
+    var btn = document.getElementById('end-retry');
+    if (title) title.textContent = win ? 'COSTA VERDE MILIKMU' : 'TAMAT';
+    if (title) title.style.color = win ? '#ffe020' : '#e83a3a';
+    if (text) text.textContent = msg || '';
+    if (btn) btn.style.display = win ? 'none' : 'inline-block';
+    this.show('end-screen');
+    if (win) CVH.audio.missionDone();
+  },
+
+  // Coba lagi misi yang sedang berjalan setelah kalah.
+  retry: function () {
+    var S = CVH.S;
+    CVH.audio.click();
+    S.mode = 'play';
+    S.paused = false;
+    S.player.hp = 100;
+    S.player.armor = 50;
+    S.heat = 0;
+    S.wanted = 0;
+    S.arrestT = 0;
+    this.hideAll();
+    CVH.missions.start(S.mission);
+  },
+
+  // Kembali ke judul dari layar akhir atau jeda.
+  toTitle: function () {
+    CVH.save.save();
+    this.showTitle();
+  },
+
+  // Kamera judul: melayang pelan menyusuri Boulevard Serena.
+  updateTitleCamera: function (dt) {
+    var S = CVH.S;
+    this.titleT += dt;
+    var t = this.titleT * 0.06;
+    // Bergerak bolak-balik di sepanjang bulevar, memandang ke utara.
+    var y = -800 + ((t * 900) % 1600);
+    S.cam.x = 900 - 40;
+    S.cam.y = y;
+    S.cam.yaw = -Math.PI / 2;
+    S.cam.dist = 200;
+    S.cam.h = 110;
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/render3d.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — render tampilan kota.
+// Proyeksi perspektif sederhana di atas canvas 2D: kamera mengikuti
+// pemain dari belakang, gedung digambar sebagai kotak bershader dengan
+// jendela menyala, palem, mobil dengan spion, gril, plat nomor dan velg,
+// serta tiap karakter digambar lengkap dengan wajahnya. Semua digambar
+// dari data dunia yang sama — tidak ada gambar luar.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.render = {
+  canvas: null,
+  ctx: null,
+  W: 1280,
+  H: 720,
+  focal: 600,
+  horizon: 290,
+
+  init: function () {
+    this.canvas = document.getElementById('game');
+    this.ctx = this.canvas.getContext('2d');
+    this.resize();
+    var self = this;
+    window.addEventListener('resize', function () {
+      self.resize();
+    });
+  },
+
+  resize: function () {
+    this.W = window.innerWidth;
+    this.H = window.innerHeight;
+    this.canvas.width = this.W;
+    this.canvas.height = this.H;
+    this.focal = (this.H / 2) / Math.tan(0.55);
+    this.horizon = this.H * 0.40;
+  },
+
+  // Proyeksi satu titik dunia ke layar. Null bila di belakang kamera.
+  project: function (x, y, z) {
+    var S = CVH.S;
+    var cam = S.cam;
+    var dx = x - cam.x;
+    var dy = y - cam.y;
+    var fwd = dx * Math.cos(cam.yaw) + dy * Math.sin(cam.yaw);
+    if (fwd < 10) return null;
+    var right = -dx * Math.sin(cam.yaw) + dy * Math.cos(cam.yaw);
+    var s = this.focal / fwd;
+    return {
+      x: this.W / 2 + right * s,
+      y: this.horizon + (cam.h - (z || 0)) * s,
+      s: s,
+      d: fwd,
+    };
+  },
+
+  // Warna digelapkan/diterangkan dengan faktor f (0..2).
+  shade: function (hex, f) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = Math.min(255, Math.max(0, Math.round(((n >> 16) & 255) * f)));
+    var g = Math.min(255, Math.max(0, Math.round(((n >> 8) & 255) * f)));
+    var b = Math.min(255, Math.max(0, Math.round((n & 255) * f)));
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  },
+
+  // Gambar poligon dari titik-titik yang sudah diproyeksi. Bila satu
+  // titik berada di belakang kamera (null), poligon dilewati saja —
+  // lebih baik ada yang tidak tergambar daripada game berhenti.
+  poly: function (pts, fill) {
+    for (var k = 0; k < pts.length; k++) {
+      if (!pts[k]) return;
+    }
+    var ctx = this.ctx;
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  // Gambar sebuah kotak: atas + sisi yang menghadap kamera + jendela.
+  drawBox: function (cx, cy, w, d, h, color, roof, windows) {
+    var hw = w / 2;
+    var hd = d / 2;
+    var top = [
+      this.project(cx - hw, cy - hd, h), this.project(cx + hw, cy - hd, h),
+      this.project(cx + hw, cy + hd, h), this.project(cx - hw, cy + hd, h),
+    ];
+    if (top[0] && top[1] && top[2] && top[3]) this.poly(top, roof || this.shade(color, 0.75));
+    // Sisi: tiap sisi digambar bila menghadap kamera.
+    var faces = [
+      { n: [0, -1], pts: [[cx - hw, cy - hd], [cx + hw, cy - hd]], f: 0.92 },
+      { n: [0, 1], pts: [[cx + hw, cy + hd], [cx - hw, cy + hd]], f: 0.7 },
+      { n: [-1, 0], pts: [[cx - hw, cy + hd], [cx - hw, cy - hd]], f: 0.82 },
+      { n: [1, 0], pts: [[cx + hw, cy - hd], [cx + hw, cy + hd]], f: 0.62 },
+    ];
+    var S = CVH.S;
+    for (var i = 0; i < faces.length; i++) {
+      var fc = faces[i];
+      var mx = (fc.pts[0][0] + fc.pts[1][0]) / 2;
+      var my = (fc.pts[0][1] + fc.pts[1][1]) / 2;
+      var toCamX = S.cam.x - mx;
+      var toCamY = S.cam.y - my;
+      if (toCamX * fc.n[0] + toCamY * fc.n[1] <= 0) continue;
+      var a = this.project(fc.pts[0][0], fc.pts[0][1], 0);
+      var b = this.project(fc.pts[1][0], fc.pts[1][1], 0);
+      var c = this.project(fc.pts[1][0], fc.pts[1][1], h);
+      var e = this.project(fc.pts[0][0], fc.pts[0][1], h);
+      if (!a || !b || !c || !e) continue;
+      this.poly([a, b, c, e], this.shade(color, fc.f));
+      // Jendela menyala hangat di sisi gedung.
+      if (windows) {
+        var len = Math.sqrt(Math.pow(fc.pts[1][0] - fc.pts[0][0], 2) + Math.pow(fc.pts[1][1] - fc.pts[0][1], 2));
+        var cols = Math.max(2, Math.floor(len / 34));
+        var rows = Math.max(1, Math.floor(h / 42));
+        for (var r = 0; r < rows; r++) {
+          for (var q = 0; q < cols; q++) {
+            var u = (q + 0.5) / cols;
+            var wx = fc.pts[0][0] + (fc.pts[1][0] - fc.pts[0][0]) * u;
+            var wy = fc.pts[0][1] + (fc.pts[1][1] - fc.pts[0][1]) * u;
+            var wz = 18 + ((r + 0.5) / rows) * (h - 26);
+            var wp = this.project(wx, wy, wz);
+            if (!wp) continue;
+            var lit = ((r * 7 + q * 3 + Math.floor(cx + cy)) % 5) < 3;
+            // Jendela dibatasi ukurannya supaya gedung dekat tidak
+            // berubah menjadi papan catur raksasa.
+            var ws = Math.min(13, Math.max(1.5, wp.s * 9));
+            this.ctx.fillStyle = lit ? 'rgba(255,196,90,0.95)' : 'rgba(40,50,70,0.9)';
+            this.ctx.fillRect(wp.x - ws / 2, wp.y - ws / 2, ws, ws * 1.3);
+          }
+        }
+      }
+    }
+  },
+
+  // Gambar satu ruas jalan (atau trotoar) sebagai pita yang diproyeksi.
+  drawStrip: function (x1, y1, x2, y2, w, color) {
+    var dx = x2 - x1;
+    var dy = y2 - y1;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var nx = (-dy / len) * (w / 2);
+    var ny = (dx / len) * (w / 2);
+    var pts = [
+      this.project(x1 + nx, y1 + ny, 0), this.project(x2 + nx, y2 + ny, 0),
+      this.project(x2 - nx, y2 - ny, 0), this.project(x1 - nx, y1 - ny, 0),
+    ];
+    for (var i = 0; i < 4; i++) if (!pts[i]) return;
+    this.poly(pts, color);
+  },
+
+  // Langit senja: ungu di atas, jingga di cakrawala, plus matahari.
+  drawSky: function () {
+    var ctx = this.ctx;
+    var g = ctx.createLinearGradient(0, 0, 0, this.horizon + 40);
+    g.addColorStop(0, '#2a1a4e');
+    g.addColorStop(0.45, '#7a3a6a');
+    g.addColorStop(0.8, '#e86a3a');
+    g.addColorStop(1, '#f0a050');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, this.W, this.horizon + 42);
+    // Matahari senja di arah timur (kanan saat menghadap utara).
+    var sun = ctx.createRadialGradient(this.W * 0.78, this.horizon - 30, 4, this.W * 0.78, this.horizon - 30, 130);
+    sun.addColorStop(0, 'rgba(255,220,140,0.95)');
+    sun.addColorStop(0.35, 'rgba(255,160,80,0.55)');
+    sun.addColorStop(1, 'rgba(255,140,60,0)');
+    ctx.fillStyle = sun;
+    ctx.fillRect(this.W * 0.78 - 140, this.horizon - 170, 280, 280);
+    // Tanah di bawah cakrawala: rumput kota yang gelap.
+    var g2 = ctx.createLinearGradient(0, this.horizon, 0, this.H);
+    g2.addColorStop(0, '#4a6a42');
+    g2.addColorStop(1, '#2e4a2e');
+    ctx.fillStyle = g2;
+    ctx.fillRect(0, this.horizon, this.W, this.H - this.horizon);
+  },
+
+  // Satu palem: batang melengkung dan tajuk daun.
+  drawPalm: function (p) {
+    var base = this.project(p.x, p.y, 0);
+    var top = this.project(p.x, p.y, 78 * p.s);
+    if (!base || !top) return;
+    var ctx = this.ctx;
+    ctx.strokeStyle = '#6a4a2a';
+    ctx.lineWidth = Math.min(7, Math.max(2, base.s * 5));
+    ctx.beginPath();
+    ctx.moveTo(base.x, base.y);
+    ctx.lineTo(top.x, top.y);
+    ctx.stroke();
+    // Tajuk dibatasi: palem di tepi jalan tidak boleh menelan layar.
+    var r = Math.min(95, top.s * 15 * p.s);
+    ctx.fillStyle = '#2e7a34';
+    for (var i = 0; i < 6; i++) {
+      var a = (i / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.ellipse(top.x + Math.cos(a) * r * 0.8, top.y + Math.sin(a) * r * 0.45, r * 0.75, r * 0.3, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#3a8a3a';
+    ctx.beginPath();
+    ctx.arc(top.x, top.y, r * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  // Satu mobil: bodi, kabin, kaca, roda, spion, gril, plat nomor.
+  drawCar: function (car) {
+    var ctx = this.ctx;
+    var len = car.len;
+    var wid = car.wid;
+    var fx = Math.cos(car.a);
+    var fy = Math.sin(car.a);
+    var rx = -fy;
+    var ry = fx;
+    var base = this.project(car.x, car.y, 0);
+    if (!base) return;
+    // Bodi + kabin sebagai kotak berputar.
+    var corners = function (cx, cy, l, w, z0, z1) {
+      var hl = l / 2;
+      var hw = w / 2;
+      var pts = [];
+      var offs = [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]];
+      for (var i = 0; i < 4; i++) {
+        pts.push([cx + fx * offs[i][0] + rx * offs[i][1], cy + fy * offs[i][0] + ry * offs[i][1]]);
+      }
+      return pts;
+    };
+    var body = corners(car.x, car.y, len, wid, 0, 0);
+    var top = [];
+    var bot = [];
+    for (var i = 0; i < 4; i++) {
+      bot.push(this.project(body[i][0], body[i][1], 0));
+      top.push(this.project(body[i][0], body[i][1], 15));
+    }
+    if (bot[0] && bot[1] && bot[2] && bot[3]) {
+      // Sisi bodi yang menghadap kamera.
+      this.poly([bot[0], bot[1], top[1], top[0]], this.shade(car.color, 0.72));
+      this.poly([bot[1], bot[2], top[2], top[1]], this.shade(car.color, 0.6));
+      this.poly(top, this.shade(car.color, 0.95));
+    }
+    // Kabin + kaca depan.
+    var cab = corners(car.x - len * 0.04, car.y, len * 0.52, wid * 0.82, 0, 0);
+    var cabTop = [];
+    var cabBot = [];
+    for (var j = 0; j < 4; j++) {
+      cabBot.push(this.project(cab[j][0], cab[j][1], 15));
+      cabTop.push(this.project(cab[j][0], cab[j][1], 27));
+    }
+    if (cabBot[0] && cabTop[0]) {
+      this.poly([cabBot[0], cabBot[1], cabTop[1], cabTop[0]], '#1a2530');
+      this.poly(cabTop, this.shade(car.color, 0.85));
+    }
+    // Roda: empat titik gelap di sudut bodi.
+    var wheels = [[-len * 0.32, -wid / 2], [len * 0.32, -wid / 2], [-len * 0.32, wid / 2], [len * 0.32, wid / 2]];
+    ctx.fillStyle = '#141414';
+    for (var w = 0; w < 4; w++) {
+      var wx = car.x + fx * wheels[w][0] + rx * wheels[w][1];
+      var wy = car.y + fy * wheels[w][0] + ry * wheels[w][1];
+      var wp = this.project(wx, wy, 5);
+      if (!wp) continue;
+      var wr = Math.max(2, wp.s * 6);
+      ctx.beginPath();
+      ctx.arc(wp.x, wp.y, wr, 0, Math.PI * 2);
+      ctx.fill();
+      // Velg terang di tengah roda.
+      ctx.fillStyle = '#b8b8b8';
+      ctx.beginPath();
+      ctx.arc(wp.x, wp.y, wr * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#141414';
+    }
+    // Lampu depan menyala, gril, spion, plat nomor.
+    var hl1 = this.project(car.x + fx * (len / 2) + rx * (wid * 0.28), car.y + fy * (len / 2) + ry * (wid * 0.28), 8);
+    var hl2 = this.project(car.x + fx * (len / 2) - rx * (wid * 0.28), car.y + fy * (len / 2) - ry * (wid * 0.28), 8);
+    ctx.fillStyle = '#ffe9a0';
+    if (hl1) {
+      ctx.beginPath();
+      ctx.arc(hl1.x, hl1.y, Math.max(1.5, hl1.s * 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (hl2) {
+      ctx.beginPath();
+      ctx.arc(hl2.x, hl2.y, Math.max(1.5, hl2.s * 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    var plate = this.project(car.x - fx * (len / 2), car.y - fy * (len / 2), 7);
+    if (plate) {
+      ctx.fillStyle = '#f0f0e0';
+      ctx.fillRect(plate.x - plate.s * 5, plate.y - plate.s * 2, plate.s * 10, plate.s * 4);
+    }
+    // Sirene polisi: dua titik berkedip di atap.
+    if (car.siren) {
+      var sir = this.project(car.x, car.y, 30);
+      if (sir) {
+        var on = Math.floor(car.lightPhase) % 2 === 0;
+        ctx.fillStyle = on ? '#ff2a2a' : '#2a5aff';
+        ctx.beginPath();
+        ctx.arc(sir.x, sir.y, Math.max(2, sir.s * 4), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  },
+
+  // Satu karakter dengan wajah lengkap: mata, alis, hidung, mulut, rambut.
+  drawPerson: function (p) {
+    var ctx = this.ctx;
+    var base = this.project(p.x, p.y, 0);
+    if (!base) return;
+    var u = base.s; // piksel per satuan dunia pada kedalaman ini
+    if (u < 0.05) return;
+    var bob = p.state === 'walk' ? Math.sin(p.stepPhase) * 2 * u : 0;
+    var x = base.x;
+    var y = base.y - bob;
+    // Bayangan di tanah.
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(x, base.y, 12 * u, 4 * u, 0, 0, Math.PI * 2);
+    ctx.fill();
+    var hgt = 52 * u;
+    var headR = 8.5 * u;
+    var headY = y - hgt + headR;
+    // Kaki (dua, bergantian saat berjalan).
+    ctx.fillStyle = p.pants;
+    var swing = p.state === 'walk' ? Math.sin(p.stepPhase) * 4 * u : 0;
+    ctx.fillRect(x - 5 * u, y - 20 * u, 4 * u, 20 * u + swing * 0.3);
+    ctx.fillRect(x + 1 * u, y - 20 * u, 4 * u, 20 * u - swing * 0.3);
+    // Badan.
+    ctx.fillStyle = p.shirt;
+    ctx.fillRect(x - 8 * u, y - 38 * u, 16 * u, 20 * u);
+    // Lengan.
+    ctx.fillStyle = p.skin;
+    ctx.fillRect(x - 11 * u, y - 36 * u, 3.5 * u, 15 * u);
+    ctx.fillRect(x + 7.5 * u, y - 36 * u, 3.5 * u, 15 * u);
+    // Rambut panjang perempuan jatuh ke belakang badan.
+    if (p.female && p.hairLong) {
+      ctx.fillStyle = p.hair;
+      ctx.fillRect(x - 8 * u, headY - 2 * u, 16 * u, 22 * u);
+    }
+    // Kepala + wajah.
+    ctx.fillStyle = p.skin;
+    ctx.beginPath();
+    ctx.arc(x, headY, headR, 0, Math.PI * 2);
+    ctx.fill();
+    // Rambut sesuai gaya: pendek, jambul, ikat, atau topi.
+    ctx.fillStyle = p.hairStyle === 3 ? '#1c2a44' : p.hair;
+    ctx.beginPath();
+    ctx.arc(x, headY - headR * 0.25, headR * 1.02, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.fill();
+    if (p.hairStyle === 1) {
+      ctx.fillRect(x - 3 * u, headY - headR * 2.1, 6 * u, 8 * u);
+    }
+    if (p.hairStyle === 3) {
+      ctx.fillRect(x - headR * 1.2, headY - headR * 0.9, headR * 2.4, 2.5 * u);
+    }
+    if (p.gang === 'caiman' || p.gang === 'viperas') {
+      ctx.fillStyle = p.gang === 'caiman' ? '#2a7a3a' : '#7a2a5a';
+      ctx.fillRect(x - headR, headY - headR * 0.75, headR * 2, 3 * u);
+    }
+    if (p.state === 'dead') {
+      // Tergeletak: gambar sebagai sosok rebah di tanah.
+      ctx.fillStyle = p.shirt;
+      ctx.fillRect(x - 22 * u, y - 6 * u, 44 * u, 7 * u);
+      ctx.fillStyle = p.skin;
+      ctx.beginPath();
+      ctx.arc(x - 26 * u, y - 3 * u, headR, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    // Wajah menghadap kamera: dua mata, alis, hidung, mulut.
+    var eyeY = headY - headR * 0.1;
+    var eyeDx = headR * 0.38;
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(x - eyeDx, eyeY, Math.max(0.8, headR * 0.13), 0, Math.PI * 2);
+    ctx.arc(x + eyeDx, eyeY, Math.max(0.8, headR * 0.13), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = Math.max(0.7, u * 0.9);
+    ctx.beginPath();
+    ctx.moveTo(x - eyeDx - 2 * u, eyeY - 3.5 * u);
+    ctx.lineTo(x - eyeDx + 2 * u, eyeY - 3.5 * u);
+    ctx.moveTo(x + eyeDx - 2 * u, eyeY - 3.5 * u);
+    ctx.lineTo(x + eyeDx + 2 * u, eyeY - 3.5 * u);
+    ctx.moveTo(x, eyeY + 1 * u);
+    ctx.lineTo(x, eyeY + 3.5 * u);
+    ctx.stroke();
+    ctx.strokeStyle = '#7a3a2a';
+    ctx.beginPath();
+    ctx.arc(x, eyeY + 5 * u, 2.5 * u, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+    // Nama di atas kepala untuk tokoh penting.
+    if (p.name) {
+      ctx.fillStyle = '#ffe020';
+      ctx.font = 'bold ' + Math.min(16, Math.max(9, 11 * u)) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, x, headY - headR * 2.2);
+    }
+  },
+
+  // Helikopter dengan sorotan lampu.
+  drawHeli: function () {
+    var H = CVH.heli;
+    if (!H.active) return;
+    var ctx = this.ctx;
+    var pos = this.project(H.x, H.y, H.z);
+    if (!pos) return;
+    var ground = this.project(H.x, H.y, 0);
+    // Sorotan: kerucut cahaya dari helikopter ke tanah.
+    if (ground) {
+      var g = ctx.createLinearGradient(pos.x, pos.y, ground.x, ground.y);
+      g.addColorStop(0, 'rgba(255,240,180,0.30)');
+      g.addColorStop(1, 'rgba(255,240,180,0.05)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(pos.x - 6, pos.y);
+      ctx.lineTo(ground.x - 60, ground.y);
+      ctx.lineTo(ground.x + 60, ground.y);
+      ctx.lineTo(pos.x + 6, pos.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,180,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(ground.x, ground.y, 55, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Badan + rotor berputar.
+    ctx.fillStyle = '#2a3a4a';
+    ctx.beginPath();
+    ctx.ellipse(pos.x, pos.y, 26 * pos.s * 0.4 + 12, 9 * pos.s * 0.4 + 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#c8c8c8';
+    ctx.lineWidth = 2;
+    var rot = H.rotor;
+    ctx.beginPath();
+    ctx.moveTo(pos.x - Math.cos(rot) * 34, pos.y - Math.sin(rot) * 6);
+    ctx.lineTo(pos.x + Math.cos(rot) * 34, pos.y + Math.sin(rot) * 6);
+    ctx.stroke();
+    ctx.fillStyle = '#ff2a2a';
+    ctx.beginPath();
+    ctx.arc(pos.x + 14, pos.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  // Penanda misi: wajik kuning melayang + jarak.
+  drawMarker: function () {
+    var S = CVH.S;
+    if (!S.marker) return;
+    var ctx = this.ctx;
+    var bob = Math.sin(S.t * 3) * 8;
+    var p = this.project(S.marker.x, S.marker.y, 95 + bob);
+    if (!p) return;
+    ctx.fillStyle = '#ffe020';
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 12);
+    ctx.lineTo(p.x + 9, p.y);
+    ctx.lineTo(p.x, p.y + 12);
+    ctx.lineTo(p.x - 9, p.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    var d = Math.round(CVH.missions.distTo(S.marker.x, S.marker.y));
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(d + 'm', p.x, p.y - 18);
+  },
+
+  // Garis peluru dan kilatan moncong.
+  drawEffects: function () {
+    var ctx = this.ctx;
+    var list = CVH.combat.tracers;
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
+      var a = this.project(t.x1, t.y1, 26);
+      var b = this.project(t.x2, t.y2, 26);
+      if (!a || !b) continue;
+      ctx.strokeStyle = t.enemy ? 'rgba(255,80,60,0.9)' : 'rgba(255,230,120,0.95)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    var fl = CVH.combat.flashes;
+    for (var j = 0; j < fl.length; j++) {
+      var f = fl[j];
+      var fp = this.project(f.x, f.y, 26);
+      if (!fp) continue;
+      ctx.fillStyle = 'rgba(255,220,120,0.9)';
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  // Gambar seluruh adegan 3D untuk satu frame.
+  draw: function () {
+    var ctx = this.ctx;
+    var S = CVH.S;
+    var W = CVH.world;
+    ctx.clearRect(0, 0, this.W, this.H);
+    this.drawSky();
+    var cam = S.cam;
+
+    // Jalan: gambar tiap ruas dalam potongan 150 unit supaya ujung
+    // yang jauh tidak melintasi kamera.
+    var roads = W.roads;
+    for (var i = 0; i < roads.length; i++) {
+      var r = roads[i];
+      var steps = 16;
+      for (var s = 0; s < steps; s++) {
+        var t0 = s / steps;
+        var t1 = (s + 1) / steps;
+        var x1, y1, x2, y2;
+        if (r.v) {
+          x1 = r.x; y1 = r.y1 + (r.y2 - r.y1) * t0;
+          x2 = r.x; y2 = r.y1 + (r.y2 - r.y1) * t1;
+        } else {
+          x1 = r.x1 + (r.x2 - r.x1) * t0; y1 = r.y;
+          x2 = r.x1 + (r.x2 - r.x1) * t1; y2 = r.y;
+        }
+        // Lewati ruas yang jauh di luar pandangan.
+        var midx = (x1 + x2) / 2;
+        var midy = (y1 + y2) / 2;
+        var mdx = midx - cam.x;
+        var mdy = midy - cam.y;
+        if (mdx * mdx + mdy * mdy > 1500 * 1500) continue;
+        this.drawStrip(x1, y1, x2, y2, r.w, '#3a3a40');
+        // Garis tengah kuning putus-putus.
+        var mid = Math.floor((t0 + t1) * 32) % 2 === 0;
+        if (mid) this.drawStrip(x1, y1, x2, y2, 2, '#c8b060');
+      }
+    }
+    // Trotoar di sisi jalan: pita terang di tepi aspal.
+    for (var j = 0; j < roads.length; j++) {
+      var r2 = roads[j];
+      var off = r2.w / 2 + 10;
+      if (r2.v) {
+        this.drawStrip(r2.x - off, r2.y1, r2.x - off, r2.y2, 18, '#8a8078');
+        this.drawStrip(r2.x + off, r2.y1, r2.x + off, r2.y2, 18, '#8a8078');
+      } else {
+        this.drawStrip(r2.x1, r2.y - off, r2.x2, r2.y - off, 18, '#8a8078');
+        this.drawStrip(r2.x1, r2.y + off, r2.x2, r2.y + off, 18, '#8a8078');
+      }
+    }
+    // Plaza, pantai, laut, dan dermaga.
+    var plaza = this.project(0, 0, 0);
+    if (plaza) {
+      ctx.fillStyle = '#b8a888';
+      ctx.beginPath();
+      ctx.arc(plaza.x, plaza.y, Math.max(2, plaza.s * 150), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    this.drawStrip(W.BEACH_X, -1150, W.BEACH_X, 1150, 220, '#d8c08a');
+    this.drawStrip(W.SEA_X, -1150, W.SEA_X, 1150, 200, '#2a6a8a');
+    this.drawStrip(W.pier.x - 20, W.pier.y, W.pier.x + W.pier.len, W.pier.y, W.pier.w, '#7a5a40');
+
+    // Zebra cross di persimpangan terdekat (di atas aspal, di bawah mobil).
+    var cross = W.nearestCrossing(S.player.x, S.player.y);
+    var cdx = cross.x - S.player.x;
+    var cdy = cross.y - S.player.y;
+    if (cdx * cdx + cdy * cdy < 500 * 500) {
+      for (var z = 0; z < 6; z++) {
+        this.drawStrip(cross.x - 34 + z * 13, cross.y - 40, cross.x - 34 + z * 13, cross.y + 40, 7, 'rgba(240,240,240,0.85)');
+      }
+    }
+
+    // Kumpulkan semua yang berdiri di kota, urutkan jauh-ke-dekat.
+    var items = [];
+    var self = this;
+    var depthOf = function (x, y) {
+      var dx = x - cam.x;
+      var dy = y - cam.y;
+      return dx * Math.cos(cam.yaw) + dy * Math.sin(cam.yaw);
+    };
+    W.buildings.forEach(function (b) {
+      items.push({ d: depthOf(b.x, b.y), kind: 'building', o: b });
+    });
+    W.palms.forEach(function (p) {
+      items.push({ d: depthOf(p.x, p.y), kind: 'palm', o: p });
+    });
+    W.lamps.forEach(function (l) {
+      items.push({ d: depthOf(l.x, l.y), kind: 'lamp', o: l });
+    });
+    CVH.vehicles.list.forEach(function (c) {
+      if (!c.dead) items.push({ d: depthOf(c.x, c.y), kind: 'car', o: c });
+    });
+    CVH.peds.list.forEach(function (p) {
+      items.push({ d: depthOf(p.x, p.y), kind: 'person', o: p });
+    });
+    items.push({ d: depthOf(0, 0), kind: 'monument', o: null });
+    items.push({ d: depthOf(W.ferris.x, W.ferris.y), kind: 'ferris', o: null });
+    items.push({ d: depthOf(W.lighthouse.x, W.lighthouse.y), kind: 'lighthouse', o: null });
+    items.sort(function (a, b) {
+      return b.d - a.d;
+    });
+    for (var k = 0; k < items.length; k++) {
+      var it = items[k];
+      if (it.d < 5 || it.d > 1600) continue;
+      if (it.kind === 'building') {
+        var b = it.o;
+        this.drawBox(b.x, b.y, b.w, b.d, b.h, b.c, b.roof, true);
+        if (b.shop && b.name) {
+          var sp = this.project(b.x, b.y, b.h + 14);
+          if (sp) {
+            ctx.fillStyle = '#ffe9a0';
+            // Nama toko dibatasi supaya tidak memenuhi layar saat dekat.
+            ctx.font = 'bold ' + Math.min(20, Math.max(10, sp.s * 14)) + 'px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(b.name, sp.x, sp.y);
+          }
+        }
+      } else if (it.kind === 'palm') {
+        this.drawPalm(it.o);
+      } else if (it.kind === 'lamp') {
+        var lp = this.project(it.o.x, it.o.y, 0);
+        var lt = this.project(it.o.x, it.o.y, 42);
+        if (lp && lt) {
+          ctx.strokeStyle = '#3a3a3a';
+          ctx.lineWidth = Math.max(1.5, lp.s * 2.5);
+          ctx.beginPath();
+          ctx.moveTo(lp.x, lp.y);
+          ctx.lineTo(lt.x, lt.y);
+          ctx.stroke();
+          ctx.fillStyle = '#ffe9a0';
+          ctx.beginPath();
+          ctx.arc(lt.x, lt.y, Math.min(7, Math.max(2, lt.s * 4)), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (it.kind === 'car') {
+        this.drawCar(it.o);
+      } else if (it.kind === 'person') {
+        this.drawPerson(it.o);
+      } else if (it.kind === 'monument') {
+        // Tugu Api Emas: alas batu + api emas menyala.
+        this.drawBox(0, 0, 34, 34, 26, '#8a8078', '#6a6058', false);
+        var fp = this.project(0, 0, 26);
+        var ft = this.project(0, 0, 78);
+        if (fp && ft) {
+          var fg = ctx.createLinearGradient(fp.x, ft.y, fp.x, fp.y);
+          fg.addColorStop(0, '#ffe020');
+          fg.addColorStop(0.6, '#f08a20');
+          fg.addColorStop(1, '#c83a10');
+          ctx.fillStyle = fg;
+          ctx.beginPath();
+          ctx.moveTo(fp.x - 12 * fp.s * 0.4 - 6, fp.y);
+          ctx.quadraticCurveTo(fp.x - 16, ft.y + 14, fp.x, ft.y);
+          ctx.quadraticCurveTo(fp.x + 16, ft.y + 14, fp.x + 12 * fp.s * 0.4 + 6, fp.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+      } else if (it.kind === 'ferris') {
+        var f = W.ferris;
+        var fc = this.project(f.x, f.y, 70);
+        if (fc) {
+          ctx.strokeStyle = '#e8e8e8';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(fc.x, fc.y, Math.max(3, fc.s * f.r), 0, Math.PI * 2);
+          ctx.stroke();
+          for (var sp2 = 0; sp2 < 8; sp2++) {
+            var sa = (sp2 / 8) * Math.PI * 2 + S.t * 0.1;
+            ctx.beginPath();
+            ctx.moveTo(fc.x, fc.y);
+            ctx.lineTo(fc.x + Math.cos(sa) * fc.s * f.r, fc.y + Math.sin(sa) * fc.s * f.r * 0.5 - fc.s * 20);
+            ctx.stroke();
+          }
+        }
+      } else if (it.kind === 'lighthouse') {
+        var lh = W.lighthouse;
+        this.drawBox(lh.x, lh.y, 30, 30, 120, '#e8e8e8', '#c83a3a', false);
+        var lp2 = this.project(lh.x, lh.y, 126);
+        if (lp2) {
+          ctx.fillStyle = 'rgba(255,240,180,0.9)';
+          ctx.beginPath();
+          ctx.arc(lp2.x, lp2.y, Math.max(3, lp2.s * 6), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    // Pemain jalan kaki digambar terakhir bila tidak di mobil.
+    if (!S.player.car && S.mode !== 'title') {
+      this.drawPerson({
+        x: S.player.x, y: S.player.y, a: S.player.a,
+        skin: '#c98d5f', hair: '#1c1410', hairStyle: 0, hairLong: false,
+        shirt: '#d84a4a', pants: '#2a3a55', female: false,
+        state: 'walk', stepPhase: S.t * 8, gang: null, name: '',
+      });
+    }
+    this.drawHeli();
+    this.drawMarker();
+    this.drawEffects();
+  },
+
+  // Peta kota penuh dari atas (untuk shot 3-map): jalan, gedung, pantai,
+  // plaza, dan label kawasan — digambar di canvas yang sama.
+  drawMap: function () {
+    var ctx = this.ctx;
+    var W = CVH.world;
+    var S = CVH.S;
+    ctx.fillStyle = '#22442a';
+    ctx.fillRect(0, 0, this.W, this.H);
+    var scale = Math.min(this.W, this.H) / (W.BOUND * 2 + 160);
+    var ox = this.W / 2;
+    var oy = this.H / 2;
+    var X = function (x) {
+      return ox + x * scale;
+    };
+    var Y = function (y) {
+      return oy + y * scale;
+    };
+    // Laut dan pasir.
+    ctx.fillStyle = '#2a6a8a';
+    ctx.fillRect(X(W.SEA_X), 0, this.W, this.H);
+    ctx.fillStyle = '#d8c08a';
+    ctx.fillRect(X(W.BEACH_X), 0, X(W.SEA_X) - X(W.BEACH_X), this.H);
+    // Jalan.
+    ctx.strokeStyle = '#3a3a40';
+    ctx.lineWidth = 84 * scale;
+    W.roads.forEach(function (r) {
+      ctx.beginPath();
+      if (r.v) {
+        ctx.moveTo(X(r.x), Y(r.y1));
+        ctx.lineTo(X(r.x), Y(r.y2));
+      } else {
+        ctx.moveTo(X(r.x1), Y(r.y));
+        ctx.lineTo(X(r.x2), Y(r.y));
+      }
+      ctx.stroke();
+    });
+    // Gedung.
+    W.buildings.forEach(function (b) {
+      ctx.fillStyle = b.c;
+      ctx.fillRect(X(b.x - b.w / 2), Y(b.y - b.d / 2), b.w * scale, b.d * scale);
+    });
+    // Plaza + monumen + dermaga + mercusuar.
+    ctx.fillStyle = '#b8a888';
+    ctx.beginPath();
+    ctx.arc(X(0), Y(0), 150 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffe020';
+    ctx.beginPath();
+    ctx.arc(X(0), Y(0), 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#7a5a40';
+    ctx.fillRect(X(W.pier.x - 20), Y(W.pier.y - W.pier.w / 2), (W.pier.len + 20) * scale, W.pier.w * scale);
+    ctx.fillStyle = '#e8e8e8';
+    ctx.beginPath();
+    ctx.arc(X(W.lighthouse.x), Y(W.lighthouse.y), 8, 0, Math.PI * 2);
+    ctx.fill();
+    // Label kawasan.
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('COSTA VERDE', ox, 46);
+    ctx.font = '16px sans-serif';
+    ctx.fillText('Playa Serena', X(980), Y(-800));
+    ctx.fillText('Marina Norte', X(-450), Y(-1000));
+    ctx.fillText('Puerto Azul', X(-450), Y(1000));
+    ctx.fillText('Barrio Verde', X(-950), Y(0));
+    ctx.fillText('Plaza Api Emas', X(0), Y(190));
+    ctx.fillText('Boulevard Serena', X(900), Y(1080));
+    // Pemain.
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(X(S.player.x), Y(S.player.y), 6, 0, Math.PI * 2);
+    ctx.fill();
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/input.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — input.
+// Keyboard dan mouse di desktop, plus kontrol sentuh di layar kecil:
+// joystick virtual untuk bergerak dan tombol FIRE / ACT / CAR. Semua
+// masukan lain di game membaca dari modul ini, bukan dari event mentah.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.input = {
+  keys: {},
+  pressedKeys: {},
+  mouse: { x: 0, y: 0, down: false, active: false },
+  joy: { x: 0, y: 0, active: false },
+  fireHeld: false,
+  actPressed: false,
+  carPressed: false,
+
+  init: function () {
+    var self = this;
+    window.addEventListener('keydown', function (e) {
+      if (!self.keys[e.code]) self.pressedKeys[e.code] = true;
+      self.keys[e.code] = true;
+      if (e.code === 'Escape' || e.code === 'KeyP') CVH.menus.togglePause();
+      if (e.code === 'KeyM') CVH.radio.next();
+      if (e.code === 'Digit1') CVH.S.player.weapon = 0;
+      if (e.code === 'Digit2') CVH.S.player.weapon = 1;
+      if (e.code === 'Digit3') CVH.S.player.weapon = 2;
+      if (e.code === 'Digit4') CVH.S.player.weapon = 3;
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.code) >= 0) e.preventDefault();
+    });
+    window.addEventListener('keyup', function (e) {
+      self.keys[e.code] = false;
+    });
+    window.addEventListener('mousemove', function (e) {
+      self.mouse.x = e.clientX;
+      self.mouse.y = e.clientY;
+      self.mouse.active = true;
+    });
+    window.addEventListener('mousedown', function (e) {
+      if (e.button === 0) {
+        self.mouse.down = true;
+        self.mouse.active = true;
+      }
+    });
+    window.addEventListener('mouseup', function () {
+      self.mouse.down = false;
+    });
+    window.addEventListener('blur', function () {
+      self.keys = {};
+      self.mouse.down = false;
+      self.fireHeld = false;
+    });
+
+    // Joystick virtual: seret di dalam lingkarannya.
+    var stick = document.getElementById('joy-stick');
+    var base = document.getElementById('joy-base');
+    if (base && stick) {
+      var move = function (e) {
+        var r = base.getBoundingClientRect();
+        var cx = r.left + r.width / 2;
+        var cy = r.top + r.height / 2;
+        var t = e.touches ? e.touches[0] : e;
+        var dx = (t.clientX - cx) / (r.width / 2);
+        var dy = (t.clientY - cy) / (r.height / 2);
+        var len = Math.sqrt(dx * dx + dy * dy);
+        if (len > 1) {
+          dx /= len;
+          dy /= len;
+        }
+        self.joy.x = dx;
+        self.joy.y = dy;
+        self.joy.active = true;
+        stick.style.transform = 'translate(' + dx * 34 + 'px,' + dy * 34 + 'px)';
+        e.preventDefault();
+      };
+      var end = function () {
+        self.joy.x = 0;
+        self.joy.y = 0;
+        self.joy.active = false;
+        stick.style.transform = 'translate(0px,0px)';
+      };
+      base.addEventListener('touchstart', move, { passive: false });
+      base.addEventListener('touchmove', move, { passive: false });
+      base.addEventListener('touchend', end);
+      base.addEventListener('mousedown', move);
+      window.addEventListener('mouseup', end);
+    }
+    // Tombol sentuh: FIRE menembak/memukul, ACT aksi, CAR masuk mobil.
+    var bindBtn = function (id, down, up) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        down();
+      }, { passive: false });
+      el.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        down();
+      });
+      if (up) {
+        el.addEventListener('touchend', up);
+        el.addEventListener('mouseup', up);
+      }
+    };
+    bindBtn('btn-fire', function () {
+      self.fireHeld = true;
+    }, function () {
+      self.fireHeld = false;
+    });
+    bindBtn('btn-act', function () {
+      self.actPressed = true;
+    });
+    bindBtn('btn-car', function () {
+      self.carPressed = true;
+    });
+    // Tampilkan kontrol sentuh hanya di perangkat sentuh.
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      var touch = document.getElementById('touch-controls');
+      if (touch) touch.style.display = 'block';
+    }
+  },
+
+  // Apakah tombol ini baru saja ditekan (sekali per frame)?
+  pressed: function (code) {
+    return !!this.pressedKeys[code];
+  },
+
+  // Sumbu gerak -1..1: x ke kanan, y ke bawah (layar). WASD, panah,
+  // atau joystick. Dipakai jalan kaki dan mengemudi.
+  axis: function () {
+    var x = 0;
+    var y = 0;
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) x -= 1;
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) x += 1;
+    if (this.keys['KeyW'] || this.keys['ArrowUp']) y -= 1;
+    if (this.keys['KeyS'] || this.keys['ArrowDown']) y += 1;
+    if (this.joy.active) {
+      x = this.joy.x;
+      y = this.joy.y;
+    }
+    var len = Math.sqrt(x * x + y * y);
+    if (len > 1) {
+      x /= len;
+      y /= len;
+    }
+    return { x: x, y: y };
+  },
+
+  // Dipanggil di akhir tiap frame: tombol sekali-tekan dibersihkan.
+  endFrame: function () {
+    this.pressedKeys = {};
+    this.actPressed = false;
+    if (this.carPressed) {
+      CVH.player.tryEnterCar();
+      this.carPressed = false;
+    }
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/audio.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — suara.
+// Semua efek dibuat dengan WebAudio murni (osilator dan noise), tanpa
+// satu pun file suara eksternal: mesin, sirene, tembakan, tabrakan,
+// klik menu, dan denting checkpoint. Audio baru hidup setelah gestur
+// pertama pemain, sesuai aturan browser.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.audio = {
+  ctx: null,
+  master: null,
+  engineOsc: null,
+  engineGain: null,
+  sirenOsc: null,
+  sirenGain: null,
+  sirenOn: false,
+  muted: false,
+
+  // Hidupkan konteks audio (dipanggil dari gestur pertama).
+  ensure: function () {
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return;
+    }
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.5;
+      this.master.connect(this.ctx.destination);
+      // Mesin: osilator gigi gergaji pelan yang nadanya ikut kecepatan.
+      this.engineOsc = this.ctx.createOscillator();
+      this.engineOsc.type = 'sawtooth';
+      this.engineOsc.frequency.value = 55;
+      this.engineGain = this.ctx.createGain();
+      this.engineGain.gain.value = 0;
+      this.engineOsc.connect(this.engineGain);
+      this.engineGain.connect(this.master);
+      this.engineOsc.start();
+      // Sirene: dua nada yang bergantian naik-turun.
+      this.sirenOsc = this.ctx.createOscillator();
+      this.sirenOsc.type = 'sine';
+      this.sirenOsc.frequency.value = 700;
+      this.sirenGain = this.ctx.createGain();
+      this.sirenGain.gain.value = 0;
+      this.sirenOsc.connect(this.sirenGain);
+      this.sirenGain.connect(this.master);
+      this.sirenOsc.start();
+    } catch (e) {
+      this.ctx = null;
+    }
+  },
+
+  // Nada pendek dengan selubung naik-turun.
+  tone: function (freq, dur, type, vol, slideTo) {
+    if (!this.ctx || this.muted) return;
+    try {
+      var o = this.ctx.createOscillator();
+      var g = this.ctx.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + dur);
+      g.gain.setValueAtTime(vol || 0.2, this.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+      o.connect(g);
+      g.connect(this.master);
+      o.start();
+      o.stop(this.ctx.currentTime + dur);
+    } catch (e) {}
+  },
+
+  // Desis noise pendek (untuk tembakan dan tabrakan).
+  noise: function (dur, vol, low) {
+    if (!this.ctx || this.muted) return;
+    try {
+      var len = Math.floor(this.ctx.sampleRate * dur);
+      var buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      var data = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      var g = this.ctx.createGain();
+      g.gain.value = vol || 0.3;
+      src.connect(g);
+      g.connect(this.master);
+      src.start();
+    } catch (e) {}
+  },
+
+  click: function () {
+    this.tone(880, 0.06, 'square', 0.12);
+  },
+
+  shoot: function () {
+    this.noise(0.12, 0.35);
+    this.tone(160, 0.1, 'square', 0.15, 60);
+  },
+
+  punch: function () {
+    this.noise(0.08, 0.25);
+    this.tone(120, 0.08, 'sine', 0.2, 70);
+  },
+
+  crash: function () {
+    this.noise(0.3, 0.5);
+    this.tone(90, 0.25, 'sawtooth', 0.25, 40);
+  },
+
+  checkpoint: function () {
+    this.tone(660, 0.12, 'sine', 0.22);
+    var self = this;
+    setTimeout(function () {
+      self.tone(990, 0.18, 'sine', 0.22);
+    }, 110);
+  },
+
+  missionDone: function () {
+    var self = this;
+    [523, 659, 784, 1046].forEach(function (f, i) {
+      setTimeout(function () {
+        self.tone(f, 0.22, 'triangle', 0.22);
+      }, i * 130);
+    });
+  },
+
+  // Mesin menyala mengikuti kecepatan; mati bila jalan kaki.
+  engine: function (on, speed) {
+    if (!this.ctx || !this.engineGain) return;
+    var target = on ? 0.04 + Math.min(0.1, Math.abs(speed) / 3200) : 0;
+    this.engineGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.1);
+    if (this.engineOsc) {
+      this.engineOsc.frequency.setTargetAtTime(50 + Math.abs(speed) * 0.35, this.ctx.currentTime, 0.1);
+    }
+  },
+
+  // Sirene polisi: nada naik-turun dua arah.
+  siren: function (on) {
+    this.sirenOn = on;
+    if (!this.ctx || !this.sirenGain) return;
+    this.sirenGain.gain.setTargetAtTime(on ? 0.05 : 0, this.ctx.currentTime, 0.2);
+    if (on && this.sirenOsc) {
+      var self = this;
+      var t = 0;
+      var iv = setInterval(function () {
+        if (!self.sirenOn || !self.sirenOsc) {
+          clearInterval(iv);
+          return;
+        }
+        t++;
+        self.sirenOsc.frequency.setTargetAtTime(t % 2 === 0 ? 700 : 950, self.ctx.currentTime, 0.05);
+      }, 450);
+    }
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/radio.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — radio.
+// Empat stasiun synth fiktif dengan daftar lagunya sendiri-sendiri.
+// Tombol M (atau ketuk label radio) mengganti stasiun; lagu yang
+// diputar berganti mengikuti jam kota.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.radio = {
+  idx: 0,
+  stations: [
+    {
+      name: 'Onda Coral 98.7',
+      dj: 'Los Faroles',
+      tracks: ['Brisa de las Cinco', 'Noche en la Playa', 'Coral y Sal', 'Viento del Sur'],
+    },
+    {
+      name: 'Radio Faro 101.2',
+      dj: 'La Voz del Puerto',
+      tracks: ['Sirena de Medianoche', 'Callejón Verde', 'Luces del Malecón'],
+    },
+    {
+      name: 'Tropical 88.4',
+      dj: 'DJ Palma',
+      tracks: ['Baila Serena', 'Ritmo de la Costa', 'Sol de Agosto', 'Mar y Arena'],
+    },
+    {
+      name: 'Onda Vieja 92.1',
+      dj: 'Don Emilio',
+      tracks: ['Bolero del Faro', 'Recuerdos de Coral', 'La Última Carta'],
+    },
+  ],
+
+  current: function () {
+    return this.stations[this.idx];
+  },
+
+  next: function () {
+    this.idx = (this.idx + 1) % this.stations.length;
+    CVH.hud.toast('Radio: ' + this.current().name);
+    CVH.audio.click();
+  },
+
+  // Lagu yang sedang diputar: dipilih dari jam kota supaya berganti
+  // sendiri seiring waktu.
+  now: function () {
+    var S = CVH.S;
+    var st = this.current();
+    var slot = Math.floor((S ? S.clock : 17.7) * 2) % st.tracks.length;
+    return st.name + ' — "' + st.tracks[slot] + '" · ' + st.dj;
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/savegame.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — simpan dan muat progres.
+// Progres (misi, uang, health, armor, posisi, dan garasi) disimpan ke
+// localStorage dengan satu kunci. Tidak ada yang dikirim ke mana pun.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.save = {
+  KEY: 'costa-verde-heat-save-v1',
+
+  save: function () {
+    try {
+      var S = CVH.S;
+      var data = {
+        mission: S.mission,
+        money: S.player.money,
+        hp: S.player.hp,
+        armor: S.player.armor,
+        x: S.player.x,
+        y: S.player.y,
+        day: S.day,
+        clock: S.clock,
+        garage: CVH.garage.stored.map(function (c) {
+          return { def: c.def, color: c.color };
+        }),
+      };
+      localStorage.setItem(this.KEY, JSON.stringify(data));
+    } catch (e) {}
+  },
+
+  // Muat bila ada. Mengembalikan true bila simpanan ditemukan.
+  load: function () {
+    try {
+      var raw = localStorage.getItem(this.KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      var S = CVH.S;
+      if (typeof data.mission === 'number' && data.mission >= 0 && data.mission < 12) {
+        S.player.money = data.money || 12480;
+        S.player.hp = data.hp || 100;
+        S.player.armor = data.armor || 50;
+        S.player.x = data.x || 60;
+        S.player.y = data.y || 140;
+        S.day = data.day || 3;
+        S.clock = data.clock || 17.68;
+        CVH.missions.start(data.mission);
+        CVH.hud.toast('Progres dimuat — lanjut misi ' + (data.mission + 1) + '/12.');
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  },
+
+  clear: function () {
+    try {
+      localStorage.removeItem(this.KEY);
+    } catch (e) {}
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/garage.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — garasi.
+// Garasi di Barrio Verde (titik -600, 600): mobil yang sedang dikendarai
+// bisa disimpan di sini, dan mobil simpanan bisa diambil lagi. Mobil
+// simpanan ikut tersimpan bersama progres.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.garage = {
+  stored: [],
+  spot: { x: -600, y: 600, r: 90 },
+
+  // Apakah pemain sedang berada di dalam garasi?
+  inside: function () {
+    var S = CVH.S;
+    var dx = S.player.x - this.spot.x;
+    var dy = S.player.y - this.spot.y;
+    return dx * dx + dy * dy < this.spot.r * this.spot.r;
+  },
+
+  // Simpan mobil yang sedang dikendarai ke garasi.
+  store: function () {
+    var S = CVH.S;
+    var car = S.player.car;
+    if (!car) {
+      CVH.hud.toast('Tidak ada mobil untuk disimpan.');
+      return;
+    }
+    if (this.stored.length >= 4) {
+      CVH.hud.toast('Garasi penuh (maks 4 mobil).');
+      return;
+    }
+    this.stored.push({ def: car.def, color: car.color, hp: car.hp });
+    car.dead = true;
+    S.player.car = null;
+    CVH.hud.toast(car.name + ' disimpan di garasi.');
+    CVH.audio.checkpoint();
+    CVH.save.save();
+  },
+
+  // Ambil mobil simpanan ke-i dan munculkan di depan garasi.
+  take: function (i) {
+    var S = CVH.S;
+    var saved = this.stored[i];
+    if (!saved) return;
+    this.stored.splice(i, 1);
+    var car = CVH.vehicles.make(saved.def, this.spot.x + 40, this.spot.y, 0, 'parked');
+    car.color = saved.color;
+    car.hp = saved.hp || 100;
+    CVH.hud.toast(car.name + ' dikeluarkan dari garasi.');
+    CVH.save.save();
+  },
+
+  // Daftar isi garasi untuk HUD (dipanggil saat pemain di garasi).
+  listText: function () {
+    if (this.stored.length === 0) return 'Garasi kosong.';
+    return this.stored
+      .map(function (c, i) {
+        return (i + 1) + '. ' + (CVH.vehicles.defs[c.def] ? CVH.vehicles.defs[c.def].name : c.def);
+      })
+      .join('  ');
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/shots.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — pementasan adegan foto.
+// Game membaca parameter query (mis. ?shot=cover&seed=7) dan menata
+// dunia menjadi satu dari empat adegan: kejar-kejaran di bulevar,
+// baku tembak, peta kota penuh, atau layar judul. Bila adegan sudah
+// siap difoto, game memberi tanda lewat window.__shotReady.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.shots = {
+  // Baca parameter query dari alamat game.
+  params: function () {
+    var out = {};
+    try {
+      var q = new URLSearchParams(window.location.search);
+      q.forEach(function (v, k) {
+        out[k] = v;
+      });
+    } catch (e) {}
+    return out;
+  },
+
+  // Tata satu adegan. Dipanggil sekali saat boot, sesudah dunia jadi.
+  stage: function () {
+    var S = CVH.S;
+    var p = this.params();
+    var shot = p.shot || null;
+    var seed = parseInt(p.seed || '7', 10) || 7;
+    if (!shot) return;
+    S.shot = shot;
+    S.seed = seed;
+    CVH.rng.seed(seed);
+    // Foto tidak boleh tertutup layar menu atau catatan boot.
+    CVH.menus.hideAll();
+    var note = document.getElementById('boot-note');
+    if (note) note.style.display = 'none';
+    try {
+      if (shot === 'cover') this.stageCover();
+      else if (shot === 'shootout') this.stageShootout();
+      else if (shot === 'map') this.stageMap();
+      else if (shot === 'title') this.stageTitle();
+    } catch (e) {
+      window.__shotError = 'stage ' + shot + ': ' + e.message;
+    }
+  },
+
+  // Siapkan mobil Coral GT untuk pemain dan letakkan di bulevar.
+  giveCoral: function (x, y, a) {
+    var S = CVH.S;
+    var car = CVH.vehicles.make('coral', x, y, a, 'player');
+    car.color = '#d8322a';
+    car.speed = 180;
+    S.player.car = car;
+    S.player.x = x;
+    S.player.y = y;
+    S.player.a = a;
+    return car;
+  },
+
+  // 1-cover: kejar-kejaran di Boulevard Serena saat senja — pemain di
+  // Coral GT, lima unit PMCV mengejar, helikopter di atas, HUD lengkap.
+  stageCover: function () {
+    var S = CVH.S;
+    S.mode = 'play';
+    S.day = 3;
+    S.clock = 17.68;
+    S.player.money = 12480;
+    S.player.hp = 86;
+    S.player.armor = 42;
+    this.giveCoral(900, 260, -Math.PI / 2);
+    S.mission = 7;
+    S.mstage = 0;
+    S.mdata = { surviveT: 41 };
+    S.heat = 100;
+    S.wanted = 4;
+    S.forceHeli = true;
+    // Helikopter mulai di utara pemain supaya masuk ke dalam bingkai.
+    CVH.heli.angle = -Math.PI / 2;
+    CVH.heli.x = 900;
+    CVH.heli.y = 120;
+    CVH.heli.active = true;
+    // Kamera agak jauh supaya Coral GT utuh terlihat di atas dialog,
+    // dan mobil terus melaju (cruise) agar kejar-kejaran tetap hidup.
+    S.camDist = 260;
+    S.cruise = true;
+    // Lima unit patroli di sekitar pemain, sirene menyala.
+    var spots = [
+      [830, 120, -Math.PI / 2], [970, 60, -Math.PI / 2], [860, 380, -Math.PI / 2],
+      [940, 420, -Math.PI / 2], [900, -40, -Math.PI / 2],
+    ];
+    for (var i = 0; i < spots.length; i++) {
+      var c = CVH.vehicles.make('police', spots[i][0], spots[i][1], spots[i][2], 'police');
+      c.siren = true;
+      c.speed = 200;
+    }
+    CVH.hud.setEvent('PMCV PURSUIT — SUSPECT CAR FLEEING ALONG BOULEVARD SERENA', 60);
+    // Tanpa dialog di cover: kotak dialog akan menutupi Coral GT.
+    S.marker = { x: 900, y: -600, label: 'MARINA' };
+  },
+
+  // 2-shootout: baku tembak di Puerto Azul — pemain jalan kaki dengan
+  // senapan, wajah petugas dan penembak Caimán terlihat jelas.
+  stageShootout: function () {
+    var S = CVH.S;
+    S.mode = 'play';
+    S.day = 3;
+    S.clock = 17.68;
+    S.player.money = 12480;
+    S.player.x = 300;
+    S.player.y = 640;
+    S.player.a = -Math.PI / 2;
+    S.player.hp = 78;
+    S.player.armor = 30;
+    S.player.weapon = 3;
+    S.mission = 9;
+    S.mstage = 0;
+    S.mdata = { kills0: S.player.kills };
+    S.heat = 0;
+    S.wanted = 0;
+    // Penembak Caimán di seberang jalan, polisi berlindung di mobil.
+    var gang = CVH.missions.spawnGang('caiman', 300, 520, 4, 90);
+    for (var i = 0; i < 3; i++) {
+      CVH.peds.make(240 + i * 36, 690, { police: true });
+    }
+    var copCar = CVH.vehicles.make('police', 260, 700, Math.PI / 2, 'police');
+    copCar.siren = true;
+    // Garis peluru yang membeku di udara untuk foto.
+    CVH.combat.tracers.push({ x1: 300, y1: 620, x2: 300, y2: 540, t: 30 });
+    CVH.combat.tracers.push({ x1: 270, y1: 690, x2: 300, y2: 560, t: 30, enemy: true });
+    CVH.hud.setEvent('SHOTS FIRED — PMCV VS CAIMÁN, PUERTO AZUL', 60);
+    CVH.hud.queueDialog([
+      { who: 'PAZ IBARRA · LOOKOUT', text: 'Polisi terjepit di balik mobil mereka, Nico — habisi sisi Caimán!' },
+    ]);
+    S.marker = { x: 300, y: 520, label: 'CAIMÁN' };
+  },
+
+  // 3-map: peta kota penuh dari atas, HUD disembunyikan.
+  stageMap: function () {
+    var S = CVH.S;
+    S.mode = 'play';
+    S.mapShot = true;
+    S.player.x = 0;
+    S.player.y = 0;
+    var hud = document.getElementById('hud');
+    if (hud) hud.style.display = 'none';
+    var touch = document.getElementById('touch-controls');
+    if (touch) touch.style.display = 'none';
+  },
+
+  // 4-title: layar judul di atas Boulevard Serena yang asli.
+  stageTitle: function () {
+    var S = CVH.S;
+    // Sembunyikan HUD supaya layar judul bersih seperti sampul game.
+    var hud = document.getElementById('hud');
+    if (hud) hud.style.display = 'none';
+    CVH.menus.showTitle();
+    S.cam.x = 860;
+    S.cam.y = 300;
+    S.cam.yaw = -Math.PI / 2;
+  },
+};
+
+</script>
+<script>
+/* inlined from game/src/main.js (Round 4 snapshot 0c523b7) */
+// Costa Verde Heat — loop utama dan pengikat modul.
+// Boot membangun dunia, menyebar mobil dan warga, menata adegan foto
+// bila diminta, lalu menjalankan loop: kamera mengikuti pemain dengan
+// halus, semua modul diperbarui, dan tiap frame digambar. Satu-satunya
+// tempat yang memanggil modul lain secara berurutan ada di sini.
+var CVH = window.CVH || (window.CVH = {});
+
+CVH.main = {
+  lastT: 0,
+  fireWasDown: false,
+
+  // Keadaan permainan — satu objek yang dibaca semua modul.
+  newState: function () {
+    return {
+      t: 0,
+      clock: 17.68, // senja: 17:41
+      day: 3,
+      mode: 'title',
+      paused: false,
+      player: {
+        x: 60, y: 140, a: -Math.PI / 2,
+        hp: 100, armor: 50, money: 12480,
+        car: null, weapon: 2, ammo: [Infinity, 84, 132, 18],
+        kills: 0, speed: 0,
+      },
+      cam: { x: 860, y: 400, yaw: -Math.PI / 2, h: 95, dist: 175 },
+      heat: 0,
+      wanted: 0,
+      mission: 0,
+      mstage: 0,
+      mdata: {},
+      marker: null,
+      event: '',
+      dialog: null,
+      gangWar: false,
+      rayo: null,
+      boss: null,
+      chaseCar: null,
+      arrestT: 0,
+      rayoT: 0,
+      forceHeli: false,
+      mapShot: false,
+      camDist: 0, // 0 = jarak kamera normal (165 jalan kaki / 205 mobil)
+      cruise: false, // true = mobil foto terus melaju sendiri
+      shot: null,
+      seed: 7,
+      frames: 0,
+      rp: 640,
+      coralGiven: false,
+      gameOver: null,
+    };
+  },
+
+  boot: function () {
+    CVH.S = this.newState();
+    CVH.world.build();
+    CVH.render.init();
+    CVH.input.init();
+    CVH.hud.init();
+    CVH.player.reset();
+    CVH.traffic.spawn(CVH.traffic.COUNT);
+    CVH.peds.spawn(CVH.peds.COUNT);
+    CVH.vehicles.spawnParked(10);
+    // Pelapor error merah: bila game gagal, pesannya terlihat di layar.
+    var self = this;
+    window.addEventListener('error', function (e) {
+      window.__shotError = e.message;
+      var err = document.getElementById('err');
+      if (err) {
+        err.textContent = 'ERROR: ' + e.message;
+        err.style.display = 'block';
+      }
+    });
+    // Tombol-tombol menu.
+    var bind = function (id, fn) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    };
+    bind('btn-start', function () {
+      CVH.menus.startGame();
+    });
+    bind('btn-resume', function () {
+      CVH.menus.togglePause();
+    });
+    bind('btn-quit', function () {
+      CVH.menus.toTitle();
+    });
+    bind('btn-retry', function () {
+      CVH.menus.retry();
+    });
+    bind('btn-title', function () {
+      CVH.menus.toTitle();
+    });
+    bind('radio-line', function () {
+      CVH.radio.next();
+    });
+    // Adegan foto (bila URL membawa ?shot=...) ditata sebelum loop.
+    CVH.shots.stage();
+    if (!CVH.S.shot) CVH.menus.showTitle();
+    requestAnimationFrame(function (t) {
+      self.loop(t);
+    });
+  },
+
+  // Selisih sudut terpendek (untuk menghaluskan arah kamera).
+  angleLerp: function (a, b, k) {
+    var d = b - a;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return a + d * k;
+  },
+
+  // Kamera: berdiri di belakang pemain, memandang ke arah hadapnya.
+  followCamera: function (dt) {
+    var S = CVH.S;
+    var p = S.player;
+    var dist = S.camDist > 0 ? S.camDist : (p.car ? 205 : 165);
+    var backX = p.x - Math.cos(p.a) * dist;
+    var backY = p.y - Math.sin(p.a) * dist;
+    var k = 1 - Math.pow(0.001, dt);
+    S.cam.x += (backX - S.cam.x) * k;
+    S.cam.y += (backY - S.cam.y) * k;
+    S.cam.yaw = this.angleLerp(S.cam.yaw, p.a, 1 - Math.pow(0.01, dt));
+    S.cam.h = p.car ? 105 : 92;
+    S.cam.dist = dist;
+  },
+
+  loop: function (t) {
+    var self = this;
+    requestAnimationFrame(function (nt) {
+      self.loop(nt);
+    });
+    var dt = Math.min(0.05, (t - this.lastT) / 1000 || 0.016);
+    this.lastT = t;
+    var S = CVH.S;
+    S.t += dt;
+    S.frames++;
+    // Jam kota berjalan pelan: satu menit game tiap beberapa detik.
+    S.clock += dt * 0.004;
+    if (S.clock >= 24) {
+      S.clock -= 24;
+      S.day++;
+    }
+
+    if (S.mode === 'title') {
+      CVH.menus.updateTitleCamera(dt);
+      CVH.render.draw();
+    } else if (S.mode === 'play') {
+      // Tembakan: klik sekali untuk semi-otomatis, tahan untuk otomatis.
+      var firing = CVH.input.mouse.down || CVH.input.fireHeld;
+      if (firing && S.player.weapon === 0) {
+        if (!this.fireWasDown) CVH.combat.punch();
+      } else if (firing) {
+        var def = CVH.combat.current();
+        if (def.auto || !this.fireWasDown) CVH.combat.fire();
+      }
+      this.fireWasDown = firing;
+      CVH.player.update(dt);
+      CVH.traffic.update(dt);
+      CVH.peds.update(dt);
+      CVH.police.update(dt);
+      CVH.heli.update(dt);
+      CVH.combat.update(dt);
+      CVH.missions.update(dt);
+      CVH.vehicles.separate();
+      this.followCamera(dt);
+      if (S.mapShot) CVH.render.drawMap();
+      else CVH.render.draw();
+      CVH.hud.update(dt);
+      CVH.minimap.draw();
+      // Simpan otomatis tiap 20 detik.
+      if (Math.floor(S.t) % 20 === 0 && Math.floor((S.t - dt)) % 20 !== 0) CVH.save.save();
+    } else if (S.mode === 'pause' || S.mode === 'end') {
+      // Dunia membeku, tapi tetap digambar di balik layar menu.
+      CVH.render.draw();
+    }
+    CVH.input.endFrame();
+
+    // Tanda siap untuk foto: adegan sudah ditata dan puluhan frame
+    // sudah digambar tanpa error.
+    if (S.shot && S.frames > 45 && !window.__shotReady && !window.__shotError) {
+      window.__shotReady = true;
+    }
+  },
+};
+
+// Mulai begitu halaman selesai dimuat.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function () {
+    CVH.main.boot();
+  });
+} else {
+  CVH.main.boot();
+}
+
+</script>
+</body>
+</html>
